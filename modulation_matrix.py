@@ -13,11 +13,11 @@ def get_waveplate_matrix(retardation):
         sin_del = np.sin(retardation)
         q_1 = (cos_2_theta ** 2) + (sin_2_theta ** 2 * cos_del)
         q_2 = cos_2_theta * sin_2_theta * (1 - cos_del)
-        q_3 = sin_2_theta * sin_del
+        q_3 = -1 * sin_2_theta * sin_del
 
         u_1 = q_2
         u_2 = (cos_2_theta ** 2 * cos_del) + (sin_2_theta ** 2)
-        u_3 = -1 * cos_2_theta * sin_del
+        u_3 = cos_2_theta * sin_del
 
         v_1 = -1 * q_3
         v_2 = -1 * u_3
@@ -53,10 +53,10 @@ def get_initial_stokes():
     return np.array([1, 1, 0, 0]).reshape(4, 1)
 
 
-def get_input_stokes():
+def get_input_stokes(offset=0):
     initial_stokes = get_initial_stokes()
 
-    input_angles = get_input_angles()
+    input_angles = get_input_angles(offset=offset)
 
     retardation = 2 * np.pi * 0.249
 
