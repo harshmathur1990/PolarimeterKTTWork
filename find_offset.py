@@ -1,5 +1,6 @@
 import sys
 import numpy as np
+import scipy.ndimage
 import modulation_matrix as mm
 import sunpy.io.fits
 import matplotlib.pyplot as plt
@@ -37,7 +38,9 @@ def get_squared_dist(source, dest):
 def get_modulation_matrix(offset, top_beam, bottom_beam):
     input_stokes = mm.get_input_stokes(offset)
 
-    input_stokes = input_stokes.astype(np.float64)
+    sys.stdout.write(str(input_stokes))
+
+    sys.stdout.write('\n')
 
     input_mod = np.matmul(
         input_stokes.T,
@@ -99,6 +102,10 @@ def reduce_offset(
         if not is_valid_mod_matrix(normalised_top) or \
                 not is_valid_mod_matrix(normalised_bot):
             # import ipdb;ipdb.set_trace()
+            sys.stdout.write(str(normalised_top))
+            sys.stdout.write('\n')
+            sys.stdout.write(str(normalised_bot))
+            sys.stdout.write('\n')
             sys.stdout.write('Skipping for Offset {}\n'.format(offset))
             continue
 
@@ -107,7 +114,7 @@ def reduce_offset(
 
         sys.stdout.write('\n')
         sys.stdout.write('Offset: {}'.format(offset))
-        sys.stdout.write(str(normalised_bot))
+        sys.stdout.write(str(normalised_top))
         sys.stdout.write('\n')
         sys.stdout.write(str(normalised_bot))
         sys.stdout.write('\n')
@@ -123,6 +130,13 @@ def reduce_offset(
             )
         )
     return score, res_offset, res_top, res_bot
+
+
+def read_file_for_observations(filename):
+    data, header = sunpy.io.fits.read(filename)[0]
+
+    return np.reshape(data[:, 0:530, :], (4, 100, 530, 1024), order='F'), \
+        np.reshape(data[:, 560:, :], (4, 100, 464, 1024), order='F')
 
 
 def read_file(filename):
@@ -142,65 +156,446 @@ def read_file(filename):
         data[:, ROI_BOT[0][1]:ROI_BOT[1][1], ROI_BOT[0][0]:ROI_BOT[1][0]],
         (1, 2)
     )
-    return INTENSITY_TOP.reshape(4, 24), INTENSITY_BOT.reshape(4, 24)
+    return INTENSITY_TOP.reshape(24, 4).T, INTENSITY_BOT.reshape(24, 4).T
 
 
-def plot_top_bottom_beam(top_beam, bottom_beam):
-    plt.plot(top_beam.reshape(96, ), label='top line')
-    plt.plot(bottom_beam.reshape(96, ), label='top line')
-    plt.scatter(np.arange(96), top_beam.reshape(96, ), label='top')
-    plt.scatter(np.arange(96), bottom_beam.reshape(96, ), label='bot')
-    plt.xlabel('Measurements')
-    plt.ylabel('Intensities')
-    plt.title('Intensity Vs Measurement Curve')
-    plt.legend()
+def get_demodulation_matrix(mod_matrix):
+    return np.matmul(
+        np.linalg.inv(
+            np.matmul(
+                mod_matrix.T,
+                mod_matrix
+            )
+        ),
+        mod_matrix.T
+    )
+
+
+def plot_stokes(
+    beam_name,
+    beam,
+    beam_theory
+):
+    fig1, axs1 = plt.subplots(2, 2)
+
+    l1, = axs1[0][0].plot(beam[0])
+
+    l2, = axs1[0][0].plot(beam_theory[0])
+
+    l3, = axs1[0][1].plot(beam[1])
+
+    l4, = axs1[0][1].plot(beam_theory[1])
+
+    l5, = axs1[1][0].plot(beam[2])
+
+    l6, = axs1[1][0].plot(beam_theory[2])
+
+    l7, = axs1[1][1].plot(beam[3])
+
+    l8, = axs1[1][1].plot(beam_theory[3])
+
+    fig1.legend(
+        (l1, l2), ('Mod I Practical', 'Mod I Theory'), 'upper left')
+
+    fig1.legend((
+        l3, l4), ('Mod II Practical', 'Mod II Theory'), 'upper right')
+
+    fig1.legend(
+        (l5, l6), ('Mod III Practical', 'Mod III Theory'), 'lower left')
+
+    fig1.legend(
+        (l7, l8), ('Mod IV Practical', 'Mod IV Theory'), 'lower right')
+
+    fig1.suptitle('{}'.format(beam_name))
+
+    fig1.tight_layout()
+
     plt.show()
+
+
+def plot_beam(
+    beam_name,
+    beam,
+    beam_theory
+):
+    fig1, axs1 = plt.subplots(2, 2)
+
+    l1 = axs1[0][0].scatter(list(np.arange(24)), beam[0])
+
+    l2 = axs1[0][0].scatter(list(np.arange(24)), beam_theory[0])
+
+    l3 = axs1[0][1].scatter(list(np.arange(24)), beam[1])
+
+    l4 = axs1[0][1].scatter(list(np.arange(24)), beam_theory[1])
+
+    l5 = axs1[1][0].scatter(list(np.arange(24)), beam[2])
+
+    l6 = axs1[1][0].scatter(list(np.arange(24)), beam_theory[2])
+
+    l7 = axs1[1][1].scatter(list(np.arange(24)), beam[3])
+
+    l8 = axs1[1][1].scatter(list(np.arange(24)), beam_theory[3])
+
+    fig1.legend((l1, l2), ('Mod I Practical', 'Mod I Theory'), 'upper left')
+
+    fig1.legend((l3, l4), ('Mod II Practical', 'Mod II Theory'), 'upper right')
+
+    fig1.legend(
+        (l5, l6), ('Mod III Practical', 'Mod III Theory'), 'lower left')
+
+    fig1.legend((l7, l8), ('Mod IV Practical', 'Mod IV Theory'), 'lower right')
+
+    fig1.suptitle('{}'.format(beam_name))
+
+    fig1.tight_layout()
+
+    # plt.legend()
+
+    # plt.tight_layout()
+
+    # plt.show()
+
+    fig1.savefig(
+        '{} Intensity Variation.png'.format(beam_name),
+        dpi=300,
+        format='png'
+    )
+
+
+def get_measured_stokes(filename):
+    top_beam, bottom_beam = read_file(filename)
+
+    modulation_matrix_top, modulation_matrix_bot = mm.get_modulation_matrix(
+        mm.config
+    )
+
+    demod_top = get_demodulation_matrix(modulation_matrix_top)
+
+    demod_bot = get_demodulation_matrix(modulation_matrix_bot)
+
+    stokes_top = np.matmul(
+        demod_top,
+        top_beam
+    )
+
+    stokes_bot = np.matmul(
+        demod_bot,
+        bottom_beam
+    )
+
+    return stokes_top, stokes_bot
+
+
+def get_standard_deviation(
+    offset,
+    response_matrix_top,
+    response_matrix_bot,
+    stokes_top,
+    stokes_bot
+):
+    input_stokes = mm.get_input_stokes(offset=offset)
+
+    out_stokes_top = np.matmul(
+        response_matrix_top, input_stokes
+    )
+
+    out_stokes_bot = np.matmul(
+        response_matrix_bot, input_stokes
+    )
+
+    return np.sum(np.square(out_stokes_top[3] - stokes_top[3])) + \
+        np.sum(np.square(out_stokes_bot[3] - stokes_bot[3]))
+
+
+def get_measured_stokes_observations(filename, calib_filename):
+    top_beam, bottom_beam = read_file_for_observations(filename)
+
+    modulation_matrix_top, modulation_matrix_bot = mm.get_modulation_matrix(
+        mm.config
+    )
+
+    sign_matrix_top = modulation_matrix_top / np.abs(modulation_matrix_top)
+
+    sign_matrix_bot = modulation_matrix_bot / np.abs(modulation_matrix_bot)
+
+    demod_top = get_demodulation_matrix(sign_matrix_top)
+
+    demod_bot = get_demodulation_matrix(sign_matrix_bot)
+
+    stokes_top = np.einsum('ij, jklm-> iklm', demod_top, top_beam)
+
+    stokes_bot = np.einsum('ij, jklm-> iklm', demod_bot, bottom_beam)
+
+    a, b, c = get_response_matrix_add_subtract(calib_filename)
+
+    response_matrix_top, response_matrix_bot, _ = a, b, c
+
+    inverse_response_top = np.linalg.inv(response_matrix_top)
+
+    inverse_response_bot = np.linalg.inv(response_matrix_bot)
+
+    real_stokes_top = np.einsum(
+        'ij, jklm-> iklm', inverse_response_top, stokes_top
+    )
+
+    real_stokes_bot = np.einsum(
+        'ij, jklm-> iklm', inverse_response_bot, stokes_bot
+    )
+
+    return real_stokes_top, real_stokes_bot
+
+
+def get_final_stokes_from_real_stokes(
+    real_stokes_top,
+    real_stokes_bot,
+    header
+):
+
+    cropped_stokes_top = real_stokes_top[:, :, 0:464, :]
+
+    final_stokes = np.zeros_like(cropped_stokes_top)
+
+    final_stokes[0] = cropped_stokes_top[0] + real_stokes_bot[0]
+
+    final_stokes[1] = (cropped_stokes_top[1] / cropped_stokes_top[0]) + \
+        (real_stokes_bot[1] / real_stokes_bot[0])
+
+    final_stokes[2] = (cropped_stokes_top[2] / cropped_stokes_top[0]) + \
+        (real_stokes_bot[2] / real_stokes_bot[0])
+
+    final_stokes[3] = (cropped_stokes_top[3] / cropped_stokes_top[0]) + \
+        (real_stokes_bot[3] / real_stokes_bot[0])
+
+    final_stokes[1] = final_stokes[1] * final_stokes[0] / 2
+
+    final_stokes[2] = final_stokes[2] * final_stokes[0] / 2
+
+    final_stokes[3] = final_stokes[3] * final_stokes[0] / 2
+
+    filename = '/Users/harshmathur/CourseworkRepo/' + \
+        'Level-1/20190413_093058_STOKESDATA.fits'
+    sunpy.io.fits.write(filename, final_stokes, header, overwrite=True)
+
+    return final_stokes
+
+
+def get_response_matrix_add_subtract(filename):
+    top_beam, bottom_beam = read_file(filename)
+
+    modulation_matrix_top, modulation_matrix_bot = mm.get_modulation_matrix(
+        mm.config
+    )
+
+    sign_matrix_top = modulation_matrix_top / np.abs(modulation_matrix_top)
+
+    sign_matrix_bot = modulation_matrix_bot / np.abs(modulation_matrix_bot)
+
+    demod_top = get_demodulation_matrix(sign_matrix_top)
+
+    demod_bot = get_demodulation_matrix(sign_matrix_bot)
+
+    stokes_top = np.matmul(
+        demod_top,
+        top_beam
+    )
+
+    stokes_top = stokes_top / stokes_top[0]
+
+    stokes_bot = np.matmul(
+        demod_bot,
+        bottom_beam
+    )
+
+    stokes_bot = stokes_bot / stokes_bot[0]
+
+    min_std = np.Inf
+
+    response_matrix_top, response_matrix_bot, res_offset = None, None, None
+
+    for offset in np.arange(-15, -5, 0.01):
+
+        input_stokes = mm.get_input_stokes(offset=offset)
+
+        input_matrix = np.matmul(
+            input_stokes.T,
+            np.linalg.inv(
+                np.matmul(
+                    input_stokes,
+                    input_stokes.T
+                )
+            )
+        )
+
+        _response_matrix_top = np.matmul(
+            stokes_top,
+            input_matrix
+        )
+
+        _response_matrix_bot = np.matmul(
+            stokes_bot,
+            input_matrix
+        )
+
+        std = get_standard_deviation(
+            offset,
+            _response_matrix_top,
+            _response_matrix_bot,
+            stokes_top,
+            stokes_bot
+        )
+
+        if std < min_std:
+            min_std = std
+            response_matrix_bot = _response_matrix_bot
+            response_matrix_top = _response_matrix_top
+            res_offset = offset
+
+    return response_matrix_top, response_matrix_bot, res_offset
 
 
 def execute(filename, offset_start, offset_end, step):
     top_beam, bottom_beam = read_file(filename)
 
+    # top_beam, bottom_beam = mm.get_modulated_intensity()
+
+    # top_beam = top_beam.astype(np.float64)
+
+    # bottom_beam = bottom_beam.astype(np.float64)
+
     total_intensity = top_beam + bottom_beam
 
-    a, b, c, d = np.polyfit(
-        np.arange(96), total_intensity.reshape(96, ), deg=3
+    # a, b, c, d, e, f, g, h = np.polyfit(
+    #     np.arange(96), total_intensity.reshape(96, ), deg=7
+    # )
+
+    # fitted_values = np.polyval((a, b, c, d, e, f, g, h), np.arange(96))
+
+    # top_beam = top_beam * 2 / fitted_values.reshape(4, 24)
+
+    # bottom_beam = bottom_beam * 2 / fitted_values.reshape(4, 24)
+
+    top_beam = top_beam * 2 / np.max(top_beam)
+
+    bottom_beam = bottom_beam * 2 / np.max(bottom_beam)
+
+    intensity_top_theory, intensity_bot_theory = mm.get_modulated_intensity(
+        offset=-10
     )
 
-    fitted_values = np.polyval((a, b, c, d), np.arange(96))
+    total_intensity_theory = intensity_top_theory + intensity_bot_theory
 
-    top_beam = top_beam / fitted_values.reshape(4, 24)
+    total_intensity = total_intensity * 2 / np.max(total_intensity)
 
-    bottom_beam = bottom_beam / fitted_values.reshape(4, 24)
-
-    top_beam /= np.max(top_beam)
-
-    top_beam += 0.6
-
-    bottom_beam /= np.max(bottom_beam)
-
-    bottom_beam += 0.6
-
-    plot_top_bottom_beam(top_beam, bottom_beam)
-
-    score, res_offset, res_top, res_bot = reduce_offset(
-        offset_range_start=offset_start,
-        offset_range_end=offset_end,
-        step=step,
-        top_beam=top_beam,
-        bottom_beam=bottom_beam
+    plot_beam(
+        'Total Beam',
+        total_intensity,
+        total_intensity_theory
     )
 
-    sys.stdout.write(
-        'Score: {} Offset: {}\n'.format(score, res_offset)
+    # plt.plot(top_beam[0])
+    # plt.show()
+    # plt.plot(bottom_beam[0])
+    # plt.show()
+    # plt.plot(top_beam[3])
+    # plt.show()
+    # plt.plot(bottom_beam[3])
+    # plt.show()
+
+    # score, res_offset, res_top, res_bot = reduce_offset(
+    #     offset_range_start=offset_start,
+    #     offset_range_end=offset_end,
+    #     step=step,
+    #     top_beam=top_beam,
+    #     bottom_beam=bottom_beam
+    # )
+
+    # sys.stdout.write(
+    #     'Score: {} Offset: {}\n'.format(score, res_offset)
+    # )
+
+    # sys.stdout.write(str(res_top))
+    # sys.stdout.write('\n')
+    # sys.stdout.write(str(res_bot))
+
+
+def plot_stokes_data(data_binned, stokes_bined, pixel_x, pixel_y):
+    fig, axs = plt.subplots(2, 2)
+
+    axs[0][0].plot(data_binned[0, pixel_x, pixel_y, :])
+
+    axs[0][0].set_title('Stokes I in Umbra')
+
+    axs[0][1].plot(stokes_bined[1, pixel_x, pixel_y, :])
+
+    axs[0][1].set_title('Stokes Q in Umbra')
+
+    axs[1][0].plot(stokes_bined[2, pixel_x, pixel_y, :])
+
+    axs[1][0].set_title('Stokes U in Umbra')
+
+    axs[1][1].plot(stokes_bined[3, pixel_x, pixel_y, :])
+
+    axs[1][1].set_title('Stokes V in Umbra')
+
+    plt.legend()
+
+    plt.show()
+
+
+def get_binned_image(observation_filename):
+    data, header = sunpy.io.fits.read(observation_filename)[0]
+
+    scan_step = header['SCANSTEP']
+
+    binning = int(header['BINNING'])
+
+    pixel_size = 13.5
+
+    image_binning = int(np.rint(1000 * scan_step / (pixel_size * binning)))
+
+    temp_1 = (data.shape[2] % image_binning) // 2
+
+    temp_2 = (data.shape[2] // image_binning) * image_binning
+
+    data_cropped = data[:, :, temp_1: temp_1 + temp_2, :]
+
+    data_binned = np.zeros(
+        data_cropped.shape[0],
+        data_cropped.shape[1],
+        data_cropped.shape[2] // image_binning,
+        data_cropped.shape[3]
     )
 
-    sys.stdout.write(str(res_top))
-    sys.stdout.write('\n')
-    sys.stdout.write(str(res_bot))
+    for i in range(image_binning):
+        data_binned += data_cropped[:, :, i::image_binning, :]
+
+    return data_binned
+
+
+def get_flat_profile(flat_filename):
+    flat_profile = np.loadtxt(flat_filename)
+
+    return scipy.ndimage.gaussian_filter1d(flat_profile, 1)
 
 
 if __name__ == '__main__':
-    filename = '/Volumes/Harsh 9599771751/' +\
-        'Spectropolarimetric Data Kodaikanal' +\
-        '/2019/Level-1/20190413_093058_MOD4_CALIB24.fits'
-    execute(filename, 0, 180, 1)
+    calib_filename = '/Users/harshmathur/CourseworkRepo/' + \
+        'Level-1/20190413_093058_MOD4_CALIB24.fits'
+
+    observation_filename = '/Users/harshmathur/CourseworkRepo/' + \
+        'Level-1/20190413_080629_SCAN0100_MOD4.fits'
+
+    real_stokes_top, real_stokes_bot = get_measured_stokes_observations(
+        observation_filename, calib_filename
+    )
+
+    flat_filename = '/Users/harshmathur/CourseworkRepo/' + \
+        'Level-1/20190413_083523_LINEPROFILE.txt'
+
+    header = sunpy.io.read_file_header(observation_filename)[0]
+
+    get_final_stokes_from_real_stokes(
+        real_stokes_top,
+        real_stokes_bot,
+        header
+    )

@@ -76,7 +76,7 @@ def get_input_stokes(offset=0):
         else:
             stokes_res = np.concatenate((stokes_res, _res), axis=1)
 
-    return stokes_res
+    return stokes_res.astype(np.float64)
 
 
 def get_modulation_matrix(config):
@@ -140,11 +140,12 @@ def get_modulation_matrix(config):
                 axis=0
             )
 
-    return modulation_matrix_top, modulation_matrix_bottom
+    return modulation_matrix_top.astype(np.float64), \
+        modulation_matrix_bottom.astype(np.float64)
 
 
-def get_modulated_intensity():
-    input_stokes = get_input_stokes()
+def get_modulated_intensity(offset=0):
+    input_stokes = get_input_stokes(offset=offset)
 
     modulation_matrix_top, modulation_matrix_bottom = get_modulation_matrix(
         config
