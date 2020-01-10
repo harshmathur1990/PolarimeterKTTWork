@@ -542,8 +542,8 @@ def plot_stokes_data(data_binned, stokes_bined, pixel_x, pixel_y):
     plt.show()
 
 
-def get_binned_image(observation_filename):
-    data, header = sunpy.io.fits.read(observation_filename)[0]
+def get_binned_image(stokes_filename):
+    data, header = sunpy.io.fits.read(stokes_filename)[0]
 
     scan_step = header['SCANSTEP']
 
@@ -560,10 +560,12 @@ def get_binned_image(observation_filename):
     data_cropped = data[:, :, temp_1: temp_1 + temp_2, :]
 
     data_binned = np.zeros(
-        data_cropped.shape[0],
-        data_cropped.shape[1],
-        data_cropped.shape[2] // image_binning,
-        data_cropped.shape[3]
+        (
+            data_cropped.shape[0],
+            data_cropped.shape[1],
+            data_cropped.shape[2] // image_binning,
+            data_cropped.shape[3]
+        )
     )
 
     for i in range(image_binning):
@@ -588,6 +590,9 @@ if __name__ == '__main__':
     real_stokes_top, real_stokes_bot = get_measured_stokes_observations(
         observation_filename, calib_filename
     )
+
+    stokes_filename = '/Users/harshmathur/CourseworkRepo/' + \
+        'Level-1/20190413_093058_STOKESDATA.fits'
 
     flat_filename = '/Users/harshmathur/CourseworkRepo/' + \
         'Level-1/20190413_083523_LINEPROFILE.txt'
