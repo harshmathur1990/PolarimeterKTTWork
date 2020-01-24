@@ -1,6 +1,8 @@
+from collections import defaultdict, OrderedDict
 from pathlib import Path
 import numpy as np
 import sunpy.io.fits
+import sys
 """
 In this example we will load the NINO3 sea surface temperature anomaly dataset
 between 1871 and 1996. This and other sample data files are kindly provided by
@@ -11,7 +13,7 @@ C. Torrence and G. Compo at
 # We begin by importing the relevant libraries. Please make sure that PyCWT is
 # properly installed in your system.
 import matplotlib.pyplot as plt
-
+from scipy.optimize import curve_fit
 import pycwt as wavelet
 from pycwt.helpers import find
 import pandas as pd
@@ -21,91 +23,19 @@ import pandas as pd
 # since we set them manually (*i.e.* title, units).
 
 
-def do_wavelet_transform(dat, dt):
+def plot_wavelet_trandform(
+    dat, t,
+    period, power, coi, wave,
+    scales, dt, dj, mother, sig95,
+    glbl_power, glbl_signif,
+    scale_avg_signif, scale_avg,
+    std, iwave, var,
+    fft_theor, fft_power, fftfreqs
+):
+
     title = 'Fringes across row'
     label = 'Fringes in Image'
     units = 'Pixels'
-    t0 = 0
-    # dt = 0.25  # In years
-
-    # We also create a time array in years.
-    N = dat.size
-    t = np.arange(0, N) * dt + t0
-
-    '''
-    We write the following code to detrend and normalize the input data by its
-    standard deviation. Sometimes detrending is not necessary and simply
-    removing the mean value is good enough. However, if your dataset has a well
-    defined trend, such as the Mauna Loa CO\ :sub:`2` dataset available in the
-    above mentioned website, it is strongly advised to perform detrending.
-    Here, we fit a one-degree polynomial function and then subtract it from the
-    original data.
-    '''
-    p = np.polyfit(t - t0, dat, 1)
-    dat_notrend = dat - np.polyval(p, t - t0)
-    std = dat_notrend.std()  # Standard deviation
-    var = std ** 2  # Variance
-    dat_norm = dat_notrend / std  # Normalized dataset
-
-    # The next step is to define some parameters of our wavelet analysis. We
-    # select the mother wavelet, in this case the Morlet wavelet with
-    # :math:`\omega_0=6`.
-    mother = wavelet.Morlet(6)
-    s0 = 2 * dt  # Starting scale, in this case 2 * 0.25 years = 6 months
-    dj = 1 / 12  # Twelve sub-octaves per octaves
-    J = 7 / dj  # Seven powers of two with dj sub-octaves
-    sr = pd.Series(dat)
-    alpha = sr.autocorr(lag=1)  # Lag-1 autocorrelation for red noise
-
-    '''
-    The following routines perform the wavelet transform and inverse wavelet
-    transform using the parameters defined above. Since we have normalized our
-    input time-series, we multiply the inverse transform by the standard
-    deviation.
-    '''
-    wave, scales, freqs, coi, fft, fftfreqs = wavelet.cwt(
-        dat_norm, dt, dj, s0, J, mother
-    )
-    iwave = wavelet.icwt(wave, scales, dt, dj, mother) * std
-
-    # We calculate the normalized wavelet and Fourier power spectra, as well as
-    # the Fourier equivalent periods for each wavelet scale.
-    power = (np.abs(wave)) ** 2
-    fft_power = np.abs(fft) ** 2
-    period = 1 / freqs
-
-    '''
-    We could stop at this point and plot our results. However we are also
-    interested in the power spectra significance test. The power is significant
-    where the ratio ``power / sig95 > 1``.
-    '''
-    signif, fft_theor = wavelet.significance(1.0, dt, scales, 0, alpha,
-                                             significance_level=0.95,
-                                             wavelet=mother)
-    sig95 = np.ones([1, N]) * signif[:, None]
-    sig95 = power / sig95
-
-    # Then, we calculate the global wavelet spectrum and determine its
-    # significance level.
-    glbl_power = power.mean(axis=1)
-    dof = N - scales  # Correction for padding at edges
-    glbl_signif, tmp = wavelet.significance(var, dt, scales, 1, alpha,
-                                            significance_level=0.95, dof=dof,
-                                            wavelet=mother)
-
-    # We also calculate the scale average between 2 years and 8 years, and its
-    # significance level.
-    sel = find((period >= 2) & (period < 8))
-    Cdelta = mother.cdelta
-    scale_avg = (scales * np.ones((N, 1))).transpose()
-    # As in Torrence and Compo (1998) equation 24
-    scale_avg = power / scale_avg
-    scale_avg = var * dj * dt / Cdelta * scale_avg[sel, :].sum(axis=0)
-    scale_avg_signif, tmp = wavelet.significance(var, dt, scales, 2, alpha,
-                                                 significance_level=0.95,
-                                                 dof=[scales[sel[0]],
-                                                      scales[sel[-1]]],
-                                                 wavelet=mother)
 
     '''
     Finally, we plot our results in four different subplots containing the
@@ -233,7 +163,98 @@ def do_wavelet_transform(dat, dt):
 
     plt.show()
 
-    return period, power, coi, wave, scales, dt, dj, mother
+
+def do_wavelet_transform(dat, dt):
+
+    t0 = 0
+    # dt = 0.25  # In years
+
+    # We also create a time array in years.
+    N = dat.size
+    t = np.arange(0, N) * dt + t0
+
+    '''
+    We write the following code to detrend and normalize the input data by its
+    standard deviation. Sometimes detrending is not necessary and simply
+    removing the mean value is good enough. However, if your dataset has a well
+    defined trend, such as the Mauna Loa CO\ :sub:`2` dataset available in the
+    above mentioned website, it is strongly advised to perform detrending.
+    Here, we fit a one-degree polynomial function and then subtract it from the
+    original data.
+    '''
+    p = np.polyfit(t - t0, dat, 1)
+    dat_notrend = dat - np.polyval(p, t - t0)
+    std = dat_notrend.std()  # Standard deviation
+    var = std ** 2  # Variance
+    dat_norm = dat_notrend / std  # Normalized dataset
+
+    # The next step is to define some parameters of our wavelet analysis. We
+    # select the mother wavelet, in this case the Morlet wavelet with
+    # :math:`\omega_0=6`.
+    mother = wavelet.Morlet(6)
+    s0 = 2 * dt  # Starting scale, in this case 2 * 0.25 years = 6 months
+    dj = 1 / 12  # Twelve sub-octaves per octaves
+    J = 7 / dj  # Seven powers of two with dj sub-octaves
+    sr = pd.Series(dat)
+    alpha = sr.autocorr(lag=1)  # Lag-1 autocorrelation for red noise
+
+    '''
+    The following routines perform the wavelet transform and inverse wavelet
+    transform using the parameters defined above. Since we have normalized our
+    input time-series, we multiply the inverse transform by the standard
+    deviation.
+    '''
+    wave, scales, freqs, coi, fft, fftfreqs = wavelet.cwt(
+        dat_norm, dt, dj, s0, J, mother
+    )
+    iwave = wavelet.icwt(wave, scales, dt, dj, mother) * std
+
+    # We calculate the normalized wavelet and Fourier power spectra, as well as
+    # the Fourier equivalent periods for each wavelet scale.
+    power = (np.abs(wave)) ** 2
+    fft_power = np.abs(fft) ** 2
+    period = 1 / freqs
+
+    '''
+    We could stop at this point and plot our results. However we are also
+    interested in the power spectra significance test. The power is significant
+    where the ratio ``power / sig95 > 1``.
+    '''
+    signif, fft_theor = wavelet.significance(1.0, dt, scales, 0, alpha,
+                                             significance_level=0.95,
+                                             wavelet=mother)
+    sig95 = np.ones([1, N]) * signif[:, None]
+    sig95 = power / sig95
+
+    # Then, we calculate the global wavelet spectrum and determine its
+    # significance level.
+    glbl_power = power.mean(axis=1)
+    dof = N - scales  # Correction for padding at edges
+    glbl_signif, tmp = wavelet.significance(var, dt, scales, 1, alpha,
+                                            significance_level=0.95, dof=dof,
+                                            wavelet=mother)
+
+    # We also calculate the scale average between 2 years and 8 years, and its
+    # significance level.
+    sel = find((period >= 2) & (period < 8))
+    Cdelta = mother.cdelta
+    scale_avg = (scales * np.ones((N, 1))).transpose()
+    # As in Torrence and Compo (1998) equation 24
+    scale_avg = power / scale_avg
+    scale_avg = var * dj * dt / Cdelta * scale_avg[sel, :].sum(axis=0)
+    scale_avg_signif, tmp = wavelet.significance(var, dt, scales, 2, alpha,
+                                                 significance_level=0.95,
+                                                 dof=[scales[sel[0]],
+                                                      scales[sel[-1]]],
+                                                 wavelet=mother)
+
+    return dat, t, \
+        period, power, coi, wave, \
+        scales, dt, dj, mother, sig95, \
+        glbl_power, glbl_signif, \
+        scale_avg_signif, scale_avg, \
+        std, iwave, var, \
+        fft_theor, fft_power, fftfreqs
 
 
 def stride_vertically(image, window_size):
@@ -272,14 +293,116 @@ def get_dark_corrected_data(flat_filename, dark_filename):
     return dark_corrected_flat, flat_header
 
 
+def gaus(x, a, x0, sigma):
+    return a * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
+
+
 def main_function(flat_filename, dark_filename):
     dark_corrected_flat, flat_header = get_dark_corrected_data(
         flat_filename, dark_filename
     )
 
-    smoothed_image = smooth_image(dark_corrected_flat)
+    fringe_result = np.zeros_like(dark_corrected_flat)
 
-    return smoothed_image, flat_header
+    first_iteration = np.array(
+        [300] + list(np.arange(300)) + list(np.arange(301, 1024))
+    )
+
+    result_dict = defaultdict(OrderedDict)
+
+    for i in first_iteration:
+
+        dat, t, period, power, coi, wave, scales, dt, dj, mother, sig95, glbl_power, glbl_signif, scale_avg_signif, scale_avg, std, iwave, var, fft_theor, fft_power, fftfreqs = do_wavelet_transform(
+            dark_corrected_flat[i], 1
+        )
+
+        second_iteration = np.array(
+            [568] + list(np.arange(568)) + list(np.arange(569, 1024))
+        )
+
+        maxima = None
+        for j in second_iteration:
+            y = power.T[j]
+            peaks = np.where(
+                (y[1: -1] > y[0: -2]) * (y[1: -1] > y[2:])
+            )[0] + 1
+            dips = np.where(
+                (y[1: -1] < y[0: -2]) * (y[1: -1] < y[2:])
+            )[0] + 1
+
+            maxima = peaks[np.argmax(y[peaks])]
+
+            left_minima_arr = np.where(dips < maxima)[0]
+            if left_minima_arr.size == 0:
+                left_minima_point = 0
+            else:
+                left_minima_point = dips[left_minima_arr[-1]]
+
+            right_minima_arr = np.where(dips > maxima)[0]
+
+            if right_minima_arr.size == 0:
+                right_minima_point = len(y) - 1
+            else:
+                right_minima_point = dips[right_minima_arr[0]]
+
+            # y[0: left_minima_point] = 0
+            # y[right_minima_point:] = 0
+            # mn = y[left_minima_point: right_minima_point].mean()
+            # sd = y[left_minima_point: right_minima_point].std()
+            # popt, pcov = curve_fit(
+            #     gaus,
+            #     np.arange(len(y)),
+            #     y,
+            #     p0=[1, mn, sd]
+            # )
+
+            # plt.plot(period, y, 'b+:', label='data')
+            # plt.plot(
+            #     period,
+            #     gaus(
+            #         np.arange(len(y)),
+            #         *popt
+            #     ),
+            #     'ro:',
+            #     label='fit'
+            # )
+            # plt.legend()
+            # plt.show()
+            # break
+            wave.T[j][0: left_minima_point] = 0
+            wave.T[j][right_minima_point:] = 0
+            wave.T[j][np.where(period > coi[j])] = 0
+            power.T[j][0: left_minima_point] = 0
+            power.T[j][right_minima_point:] = 0
+            power.T[j][np.where(period > coi[j])] = 0
+
+            sys.stdout.write('Worked on Row: {} and Column: {}\n'.format(i, j))
+
+        result_dict[i].update(
+            dat=dat,
+            t=t,
+            period=period,
+            power=power,
+            coi=coi,
+            wave=wave,
+            scales=scales,
+            dt=dt,
+            dj=dj,
+            mother=mother,
+            sig95=sig95,
+            glbl_power=glbl_power,
+            glbl_signif=glbl_signif,
+            scale_avg_signif=scale_avg_signif,
+            scale_avg=scale_avg,
+            std=std,
+            iwave=iwave,
+            var=var,
+            fft_theor=fft_theor,
+            fft_power=fft_power,
+            fftfreqs=fftfreqs
+        )
+
+        fringe_result[i] = wavelet.icwt(wave, scales, dt, dj, mother) * std
 
 
 if __name__ == '__main__':
