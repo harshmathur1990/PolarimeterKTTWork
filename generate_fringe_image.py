@@ -1,5 +1,6 @@
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
 from pathlib import Path
+import copy
 import numpy as np
 import sunpy.io.fits
 import sys
@@ -293,90 +294,214 @@ def get_dark_corrected_data(flat_filename, dark_filename):
     return dark_corrected_flat, flat_header
 
 
-def gaus(x, a, x0, sigma):
-    return a * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
+def get_minima_points(
+    power, wave, j, period, coi,
+    period_estimate=None, row_left=None, row_right=None,
+    col_left=None, col_right=None
+):
+    '''
+    objective is to find minimas near the period estimate
+
+    I have the period estimate, and old_left and old_right
+    which are hard bounds for left and right minimas so that
+    I don't consider more than what is required.
+
+    '''
+    y = power.T[j]
+    peaks = np.where(
+        (y[1: -1] > y[0: -2]) * (y[1: -1] > y[2:])
+    )[0] + 1
+    dips = np.where(
+        (y[1: -1] < y[0: -2]) * (y[1: -1] < y[2:])
+    )[0] + 1
+
+    if period_estimate is None:
+        maxima = peaks[np.argmax(y[peaks])]
+    else:
+        index_gt_period = np.where(
+            np.round(period[peaks]) >= np.round(period_estimate)
+        )[0]
+
+        if index_gt_period.size == 0:
+            maxima = peaks[-1]
+        else:
+            maxima = peaks[index_gt_period[0]]
+
+    left_minima_arr = np.where(dips < maxima)[0]
+    if left_minima_arr.size == 0:
+        left_minima_point = 0
+    else:
+        left_minima_point = dips[left_minima_arr[-1]]
+
+    right_minima_arr = np.where(dips > maxima)[0]
+
+    if right_minima_arr.size == 0:
+        right_minima_point = len(y) - 1
+    else:
+        right_minima_point = dips[right_minima_arr[0]]
+
+    return left_minima_point, right_minima_point
 
 
-def main_function(flat_filename, dark_filename):
-    dark_corrected_flat, flat_header = get_dark_corrected_data(
-        flat_filename, dark_filename
+def do_work(
+    work_dict, shape_0, shape_1,
+    period_estimate=None, kill_coi=True,
+    ref_row=300, ref_col=540
+):
+
+    result = np.zeros(shape=(shape_0, shape_1), dtype=np.complex)
+
+    result_dict = defaultdict(dict)
+
+    second_iter = np.array(
+        [ref_col] + list(np.arange(ref_col)[::-1]) +
+        list(np.arange(ref_col + 1, shape_1))
     )
 
-    fringe_result = np.zeros_like(dark_corrected_flat)
+    first_iter = np.array(
+        [ref_row] + list(np.arange(ref_row)[::-1]) +
+        list(np.arange(ref_row + 1, shape_0))
+    )
+
+    old_left_right_dict = defaultdict(dict)
+
+    for i in first_iter:
+        power = work_dict[i]['power'].copy()
+        wave = work_dict[i]['wave'].copy()
+        scales = work_dict[i]['scales']
+        dt = work_dict[i]['dt']
+        dj = work_dict[i]['dj']
+        mother = work_dict[i]['mother']
+        std = work_dict[i]['std']
+        period = work_dict[i]['period']
+        coi = work_dict[i]['coi']
+        for k in second_iter:
+            if i == ref_row and k == ref_col:
+                prev_col, prev_row = None, None
+            elif i == ref_row:
+                prev_row = None
+                prev_col = k + 1 if k < ref_col else k - 1
+            elif k == ref_col:
+                prev_col = None
+                prev_row = i + 1 if i < ref_row else i - 1
+            else:
+                prev_col = k + 1 if k < ref_col else k - 1
+                prev_row = i + 1 if i < ref_row else i - 1
+
+            row_left, row_right = None, None
+            col_left, col_right = None, None
+
+            if prev_row:
+                row_left, row_right = old_left_right_dict[prev_row][k]
+
+            if prev_col:
+                col_left, col_right = old_left_right_dict[i][prev_col]
+
+            left_minima_point, right_minima_point = get_minima_points(
+                power,
+                wave,
+                k,
+                period,
+                coi,
+                period_estimate=period_estimate[k],
+                row_left=row_left,
+                row_right=row_right,
+                col_left=col_left,
+                col_right=col_right
+            )
+            old_left_right_dict[i][k] = (
+                left_minima_point, right_minima_point
+            )
+            wave.T[k][0: left_minima_point] = 0
+            wave.T[k][right_minima_point:] = 0
+            if kill_coi:
+                wave.T[k][np.where(period > coi[k])] = 0
+                power.T[k][np.where(period > coi[k])] = 0
+            power.T[k][0: left_minima_point] = 0
+            power.T[k][right_minima_point:] = 0
+            sys.stdout.write(
+                'Worked for Row: {} and Column: {}\n'.format(
+                    i, k
+                )
+            )
+
+        result_dict[i].update(
+            dat=work_dict[i]['dat'],
+            t=work_dict[i]['t'],
+            period=period,
+            power=power,
+            coi=coi,
+            wave=wave,
+            scales=scales,
+            dt=dt,
+            dj=dj,
+            mother=mother,
+            sig95=work_dict[i]['sig95'],
+            glbl_power=work_dict[i]['glbl_power'],
+            glbl_signif=work_dict[i]['glbl_signif'],
+            scale_avg_signif=work_dict[i]['scale_avg_signif'],
+            scale_avg=work_dict[i]['scale_avg'],
+            std=work_dict[i]['std'],
+            iwave=work_dict[i]['iwave'],
+            var=work_dict[i]['var'],
+            fft_theor=work_dict[i]['fft_theor'],
+            fft_power=work_dict[i]['fft_power'],
+            fftfreqs=work_dict[i]['fftfreqs']
+        )
+        result[i] = wavelet.icwt(
+            wave,
+            scales,
+            dt,
+            dj,
+            mother
+        ) * std
+
+    return result, result_dict, old_left_right_dict
+
+
+def clean_data(result, kernel=7):
+    res = result.copy()
+    res[np.where(res == 0)] = np.nan
+    mn = np.nanmean(res)
+    sd = np.nanstd(res)
+
+    lim_left = mn - 3 * sd
+    lim_right = mn + 3 * sd
+
+    rr, cc = np.where((res > lim_left) & (res < lim_right))
+
+    left_win = kernel // 2
+    right_win = kernel // 2 + 1
+
+    for x, y in zip(rr, cc):
+        left_x = x - left_win if x - left_win >= 0 else 0
+        right_x = x + right_win if x + right_win < res.shape[0] \
+            else res.shape[0] - 1
+
+        left_y = y - left_win if y - left_win >= 0 else 0
+        right_y = y + right_win if y + right_win < res.shape[1] else \
+            res.shape[1] - 1
+
+        res[x][y] = np.nanmedian(res[left_x: right_x, left_y: right_y])
+
+    res[np.isnan(res)] = 0
+
+    return res
+
+
+def do_wavelet_over_image(image):
 
     first_iteration = np.array(
-        [300] + list(np.arange(300)) + list(np.arange(301, 1024))
+        [300] + list(np.arange(300)) + list(np.arange(301, image.shape[0]))
     )
 
-    result_dict = defaultdict(OrderedDict)
+    result_dict = defaultdict(dict)
 
     for i in first_iteration:
 
         dat, t, period, power, coi, wave, scales, dt, dj, mother, sig95, glbl_power, glbl_signif, scale_avg_signif, scale_avg, std, iwave, var, fft_theor, fft_power, fftfreqs = do_wavelet_transform(
-            dark_corrected_flat[i], 1
+            image[i], 1
         )
-
-        second_iteration = np.array(
-            [568] + list(np.arange(568)) + list(np.arange(569, 1024))
-        )
-
-        maxima = None
-        for j in second_iteration:
-            y = power.T[j]
-            peaks = np.where(
-                (y[1: -1] > y[0: -2]) * (y[1: -1] > y[2:])
-            )[0] + 1
-            dips = np.where(
-                (y[1: -1] < y[0: -2]) * (y[1: -1] < y[2:])
-            )[0] + 1
-
-            maxima = peaks[np.argmax(y[peaks])]
-
-            left_minima_arr = np.where(dips < maxima)[0]
-            if left_minima_arr.size == 0:
-                left_minima_point = 0
-            else:
-                left_minima_point = dips[left_minima_arr[-1]]
-
-            right_minima_arr = np.where(dips > maxima)[0]
-
-            if right_minima_arr.size == 0:
-                right_minima_point = len(y) - 1
-            else:
-                right_minima_point = dips[right_minima_arr[0]]
-
-            # y[0: left_minima_point] = 0
-            # y[right_minima_point:] = 0
-            # mn = y[left_minima_point: right_minima_point].mean()
-            # sd = y[left_minima_point: right_minima_point].std()
-            # popt, pcov = curve_fit(
-            #     gaus,
-            #     np.arange(len(y)),
-            #     y,
-            #     p0=[1, mn, sd]
-            # )
-
-            # plt.plot(period, y, 'b+:', label='data')
-            # plt.plot(
-            #     period,
-            #     gaus(
-            #         np.arange(len(y)),
-            #         *popt
-            #     ),
-            #     'ro:',
-            #     label='fit'
-            # )
-            # plt.legend()
-            # plt.show()
-            # break
-            wave.T[j][0: left_minima_point] = 0
-            wave.T[j][right_minima_point:] = 0
-            wave.T[j][np.where(period > coi[j])] = 0
-            power.T[j][0: left_minima_point] = 0
-            power.T[j][right_minima_point:] = 0
-            power.T[j][np.where(period > coi[j])] = 0
-
-            sys.stdout.write('Worked on Row: {} and Column: {}\n'.format(i, j))
 
         result_dict[i].update(
             dat=dat,
@@ -402,16 +527,22 @@ def main_function(flat_filename, dark_filename):
             fftfreqs=fftfreqs
         )
 
-        fringe_result[i] = wavelet.icwt(wave, scales, dt, dj, mother) * std
+    return result_dict
 
 
 if __name__ == '__main__':
     flat_filename = Path(
-        '/Volumes/Harsh 9599771751/Spectropolarimetric' +
-        ' Data Kodaikanal/2019/20190413/Flats/083523_FLAT.fits'
+        '/Users/harshmathur/Documents/CourseworkRepo' +
+        '/20190413/Flats/083523_FLAT.fits'
     )
 
     dark_filename = Path(
         '/Users/harshmathur/Documents/' +
         'CourseworkRepo/Level-1/083651_DARKMASTER.fits'
     )
+
+    dark_corrected_flat, flat_header = get_dark_corrected_data(
+        flat_filename, dark_filename
+    )
+
+    image = dark_corrected_flat
