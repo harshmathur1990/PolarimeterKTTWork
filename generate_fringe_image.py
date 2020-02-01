@@ -18,6 +18,7 @@ from scipy.optimize import curve_fit
 import pycwt as wavelet
 from pycwt.helpers import find
 import pandas as pd
+import skimage.draw
 
 # Then, we load the dataset and define some data related parameters. In this
 # case, the first 19 lines of the data file contain meta-data, that we ignore,
@@ -296,8 +297,8 @@ def get_dark_corrected_data(flat_filename, dark_filename):
 
 def get_minima_points(
     power, wave, j, period, coi,
-    period_estimate=None, row_left=None, row_right=None,
-    col_left=None, col_right=None
+    period_estimate, row_left=None, row_right=None,
+    col_left=None, col_right=None, standard_dev=None
 ):
     '''
     objective is to find minimas near the period estimate
@@ -308,24 +309,40 @@ def get_minima_points(
 
     '''
     y = power.T[j]
-    peaks = np.where(
-        (y[1: -1] > y[0: -2]) * (y[1: -1] > y[2:])
-    )[0] + 1
-    dips = np.where(
-        (y[1: -1] < y[0: -2]) * (y[1: -1] < y[2:])
-    )[0] + 1
 
-    if period_estimate is None:
-        maxima = peaks[np.argmax(y[peaks])]
-    else:
-        index_gt_period = np.where(
-            np.round(period[peaks]) >= np.round(period_estimate)
-        )[0]
+    maxima = None
+    count = 1
+    while not maxima:
+        period_min = period_estimate - count * standard_dev if \
+            period_estimate - count * standard_dev > period[0] else period[0]
+        period_max = period_estimate + count * standard_dev if \
+            period_estimate - count * standard_dev < period[-1] else period[-1]
 
-        if index_gt_period.size == 0:
-            maxima = peaks[-1]
-        else:
-            maxima = peaks[index_gt_period[0]]
+        index_min = np.where(period >= period_min)[0][0]
+        index_max = np.where(period >= period_max)[0][0]
+
+        selected_region = y[index_min: index_max]
+
+        peaks = index_min + np.where(
+            (selected_region[1: -1] > selected_region[0: -2]) *
+            (selected_region[1: -1] > selected_region[2:])
+        )[0] + 1
+        dips = index_min + np.where(
+            (selected_region[1: -1] < selected_region[0: -2]) *
+            (selected_region[1: -1] < selected_region[2:])
+        )[0] + 1
+
+        ref_index = np.where(
+            np.round(period) >= np.round(period_estimate))[0][0]
+
+        try:
+            maxima = peaks[np.argmin(np.abs(peaks - ref_index))]
+        except Exception:
+            count += 1
+            if period_min == period[0] and period_max == period[-1]:
+                import ipdb;ipdb.set_trace()
+            else:
+                continue
 
     left_minima_arr = np.where(dips < maxima)[0]
     if left_minima_arr.size == 0:
@@ -339,6 +356,69 @@ def get_minima_points(
         right_minima_point = len(y) - 1
     else:
         right_minima_point = dips[right_minima_arr[0]]
+
+    period_at_max_power = left_minima_point + np.argmax(
+        y[left_minima_point: right_minima_point]
+    )
+
+    if col_left and col_right and (period_at_max_power < col_left or period_at_max_power > col_right):
+        return col_left, col_right
+    return left_minima_point, right_minima_point
+
+
+def get_minima_points_alternate(
+    power, wave, j, period, coi,
+    period_estimate, row_left=None, row_right=None,
+    col_left=None, col_right=None, standard_dev=None
+):
+
+    selected_region = power.T[j]
+
+    if period_estimate < 0:
+        maxima_index = np.argmax(selected_region)
+    else:
+        np_where = np.where(
+            period.astype(np.int64) >= period_estimate.astype(np.int64)
+        )[0]
+
+        if np_where.size == 0:
+            maxima_index = len(period) - 1
+        else:
+            maxima_index = np_where[0]
+
+    peaks = np.where(
+        (selected_region[1: -1] > selected_region[0: -2]) *
+        (selected_region[1: -1] > selected_region[2:])
+    )[0] + 1
+    dips = np.where(
+        (selected_region[1: -1] < selected_region[0: -2]) *
+        (selected_region[1: -1] < selected_region[2:])
+    )[0] + 1
+
+    nearest_peak_index = peaks[np.argmin(np.abs(peaks - maxima_index))]
+
+    left_minima_arr = np.where(dips < nearest_peak_index)[0]
+    if left_minima_arr.size == 0:
+        left_minima_point = 0
+    else:
+        left_minima_point = dips[left_minima_arr[-1]]
+
+    right_minima_arr = np.where(dips > nearest_peak_index)[0]
+
+    if right_minima_arr.size == 0:
+        right_minima_point = len(selected_region) - 1
+    else:
+        right_minima_point = dips[right_minima_arr[0]]
+
+    # period_of_peak_power = left_minima_point + np.argmax(
+    #     power[left_minima_point: right_minima_point]
+    # )
+
+    # if row_right and row_left and (
+    #     period_of_peak_power > row_right or
+    #         period_of_peak_power < row_left
+    # ):
+    #     return row_left, row_right
 
     return left_minima_point, right_minima_point
 
@@ -397,17 +477,18 @@ def do_work(
             if prev_col:
                 col_left, col_right = old_left_right_dict[i][prev_col]
 
-            left_minima_point, right_minima_point = get_minima_points(
+            left_minima_point, right_minima_point = get_minima_points_alternate(
                 power,
                 wave,
                 k,
                 period,
                 coi,
-                period_estimate=period_estimate[k],
+                period_estimate=period_estimate[i][k],
                 row_left=row_left,
                 row_right=row_right,
                 col_left=col_left,
-                col_right=col_right
+                col_right=col_right,
+                standard_dev=period_estimate.std()
             )
             old_left_right_dict[i][k] = (
                 left_minima_point, right_minima_point
@@ -528,6 +609,15 @@ def do_wavelet_over_image(image):
         )
 
     return result_dict
+
+
+def gen_mask(r1, r2, image):
+    mask = np.ones_like(image)
+    rr, cc = skimage.draw.circle(0, 0, r2)
+    mask[rr, cc] = 0
+    rr, cc = skimage.draw.circle(0, 0, r1)
+    mask[rr, cc] = 1
+    return mask
 
 
 if __name__ == '__main__':
