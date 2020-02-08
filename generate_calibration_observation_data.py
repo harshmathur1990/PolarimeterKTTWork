@@ -4,7 +4,7 @@ import sunpy.io.fits
 from dark_master_generate import apply_x_shift, apply_y_shift
 
 
-write_path = Path('/Users/harshmathur/CourseworkRepo/Level-1')
+write_path = Path('/Volumes/Harsh 9599771751/Kodai Visit Processed/20200208')
 
 
 def get_keys_from_name(filepath):
@@ -18,7 +18,7 @@ def get_keys_from_name(filepath):
 
 def get_calib_key_from_name(filepath):
     keys = get_keys_from_name(filepath)
-    return keys[1], keys[0]
+    return keys[0], keys[1]
 
 
 def get_observation_key_from_name(filepath):
@@ -115,7 +115,8 @@ def save_observation_data(
     x_inclination_file,
     y_inclination_file,
     flat_master,
-    dark_master
+    dark_master,
+    index=0
 ):
     everything = observation_folder.glob('**/*')
 
@@ -135,7 +136,7 @@ def save_observation_data(
     )
 
     sunpy.io.fits.write(
-        write_path / 'observation_data.fits',
+        write_path / 'observation_data_{}.fits'.format(index),
         resultant,
         header,
         overwrite=True
@@ -144,33 +145,38 @@ def save_observation_data(
 
 if __name__ == '__main__':
     calibration_folder = Path(
-        '/Volumes/Harsh 9599771751/Spectropolarimetric' +
-        ' Data Kodaikanal/2019/20190413/CalibrationAlt/093027'
+        '/Volumes/Harsh 9599771751/Kodai Visit ' +
+        '31 Jan - 12 Feb/20200208/Calibration/093428'
     )
 
-    observation_folder = Path(
-        '/Volumes/Harsh 9599771751/Spectropolarimetric' +
-        ' Data Kodaikanal/2019/20190413/Observation/080619'
+    observation_folder_0 = Path(
+        '/Volumes/Harsh 9599771751/Kodai Visit ' +
+        '31 Jan - 12 Feb/20200208/Observation/094708'
     )
+
+    # observation_folder_1 = Path(
+    #     '/Volumes/Harsh 9599771751/Kodai Visit 31 Jan' +
+    #     ' - 12 Feb/20200206/Observation/095044'
+    # )
 
     x_inclination_file = Path(
-        '/Users/harshmathur/Documents/' +
-        'CourseworkRepo/Level-1/x_inclinations.txt'
+        '/Volumes/Harsh 9599771751/Kodai Visit' +
+        ' Processed/20200208/x_inclinations.txt'
     )
 
     y_inclination_file = Path(
-        '/Users/harshmathur/Documents/' +
-        'CourseworkRepo/Level-1/y_inclinations.txt'
+        '/Volumes/Harsh 9599771751/Kodai Visit' +
+        ' Processed/20200208/y_inclinations.txt'
     )
 
     flat_master = Path(
-        '/Users/harshmathur/Documents/CourseworkRepo' +
-        '/Level-1/083523_FLATFLATMASTER.fits'
+        '/Volumes/Harsh 9599771751/Kodai Visit' +
+        ' Processed/20200208/100306_FLATFLATMASTER.fits'
     )
 
     dark_master = Path(
         '/Users/harshmathur/Documents/CourseworkRepo' +
-        '/Level-1/083651_DARKMASTER.fits'
+        '/Kodai Visit/20200207/102402_DARK.fits'
     )
 
     save_calibration_data(
@@ -182,9 +188,19 @@ if __name__ == '__main__':
     )
 
     save_observation_data(
-        observation_folder,
+        observation_folder_0,
         x_inclination_file,
         y_inclination_file,
         flat_master,
-        dark_master
+        dark_master,
+        index=0
     )
+
+    # save_observation_data(
+    #     observation_folder_1,
+    #     x_inclination_file,
+    #     y_inclination_file,
+    #     flat_master,
+    #     dark_master,
+    #     index=1
+    # )

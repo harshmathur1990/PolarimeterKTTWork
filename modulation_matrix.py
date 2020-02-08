@@ -79,13 +79,13 @@ def get_input_stokes(offset=0):
     return stokes_res.astype(np.float64)
 
 
-def get_modulation_matrix(config):
+def get_modulation_matrix(config, wavelength=8542):
 
     modulation_matrix_top = None
     modulation_matrix_bottom = None
 
-    quarter_retardation = 2 * np.pi * 0.249
-    half_retardation = 2 * np.pi * 0.249 * 2
+    quarter_retardation = 2 * np.pi * 0.249 * 8542 / wavelength
+    half_retardation = 2 * np.pi * 0.249 * 2 * 8542 / wavelength
 
     qwp_matrix_func = get_waveplate_matrix(quarter_retardation)
     hwp_matrix_func = get_waveplate_matrix(half_retardation)
@@ -144,11 +144,11 @@ def get_modulation_matrix(config):
         modulation_matrix_bottom.astype(np.float64)
 
 
-def get_modulated_intensity(offset=0):
+def get_modulated_intensity(offset=0, wavelength=8542):
     input_stokes = get_input_stokes(offset=offset)
 
     modulation_matrix_top, modulation_matrix_bottom = get_modulation_matrix(
-        config
+        config, wavelength=wavelength
     )
 
     intensity_top = np.matmul(

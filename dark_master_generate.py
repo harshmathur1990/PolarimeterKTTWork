@@ -1,3 +1,4 @@
+import sys
 import copy
 from pathlib import Path
 import numpy as np
@@ -7,7 +8,9 @@ import sunpy.io.fits
 import matplotlib.pyplot as plt
 
 
-write_path = Path('/Users/harshmathur/CourseworkRepo/Level-1')
+# write_path = Path('/Users/harshmathur/Documents/CourseworkRepo/Kodai Visit/20200207')
+# write_path = Path('/Users/harshmathur/Documents/CourseworkRepo/Level-1')
+write_path = Path('/Volumes/Harsh 9599771751/Kodai Visit Processed/20200208')
 
 
 def generate_master_dark(dark_filename):
@@ -26,10 +29,14 @@ def generate_master_dark(dark_filename):
     sunpy.io.fits.write(save_path, smoothed_data, header)
 
 
-def generate_fringe_flat(flat_filename):
-    data, header = sunpy.io.fits.read(flat_filename)[0]
+def generate_fringe_flat(fringe_filename, dark_master):
+    data, header = sunpy.io.fits.read(fringe_filename)[0]
 
     fringe_data = np.mean(data, axis=0)
+
+    dark_data, _ = sunpy.io.fits.read(dark_master)[0]
+
+    fringe_data -= dark_data
 
     no_of_points = 50
 
@@ -71,7 +78,7 @@ def generate_fringe_flat(flat_filename):
     fringe_corrected = fringe_data / intensity_mask
 
     fringe_write_path = write_path / (
-        flat_filename.name.split('.')[-2] + 'FRINGEFLAT.fits'
+        fringe_filename.name.split('.')[-2] + 'FRINGEFLAT.fits'
     )
 
     sunpy.io.fits.write(fringe_write_path, fringe_corrected, header)
@@ -319,15 +326,19 @@ def get_master_flat_x_y_inclinations_and_line_profile(
 
     x_corrected_fringe = apply_x_shift(fringe_data, shift_vertical_apply)
 
-    fringe_corrected_flat = x_corrected_flat / x_corrected_fringe
-
-    shift_horizontal_apply = get_y_shift(fringe_corrected_flat)
+    shift_horizontal_apply = get_y_shift(x_corrected_flat)
 
     y_corrected_flat = apply_y_shift(
-        fringe_corrected_flat, shift_horizontal_apply
+        x_corrected_flat, shift_horizontal_apply
     )
 
-    flat_master, line_median = remove_line_profile(y_corrected_flat)
+    y_corrected_fringe = apply_y_shift(
+        x_corrected_fringe, shift_horizontal_apply
+    )
+
+    _, line_median = remove_line_profile(y_corrected_flat / y_corrected_fringe)
+
+    flat_master = y_corrected_flat / line_median
 
     flat_master_name = flat_filename.name.split('.')[-2] + 'FLATMASTER.fits'
 
@@ -349,21 +360,26 @@ def get_master_flat_x_y_inclinations_and_line_profile(
 
 if __name__ == '__main__':
     dark_filename = Path(
-        '/Volumes/Harsh 9599771751/Spectropolarimetric' +
-        ' Data Kodaikanal/2019/20190413/Darks/083651_DARK.fits'
+        '/Users/harshmathur/Documents/CourseworkRepo' +
+        '/Kodai Visit/20200204/102402_DARK.fits'
     )
 
     flat_filename = Path(
-        '/Volumes/Harsh 9599771751/Spectropolarimetric' +
-        ' Data Kodaikanal/2019/20190413/Flats/083523_FLAT.fits'
+        '/Volumes/Harsh 9599771751/Kodai Visit ' +
+        '31 Jan - 12 Feb/20200204/Flats/114059_FLAT.fits'
+    )
+
+    fringe_filename = Path(
+        '/Volumes/Harsh 9599771751/Kodai Visit ' +
+        '31 Jan - 12 Feb/20200207/Flats/082259_FLAT.fits'
     )
 
     fringe_master = Path(
-        '/Users/harshmathur/Documents/' +
-        'CourseworkRepo/Level-1/083523_FLATFRINGEFLAT.fits'
+        '/Users/harshmathur/Documents/CourseworkRepo' +
+        '/Kodai Visit/20200204/103556_FLATFRINGEFLAT.fits'
     )
 
     dark_master = Path(
         '/Users/harshmathur/Documents/CourseworkRepo' +
-        '/Level-1/083651_DARKMASTER.fits'
+        '/Kodai Visit/20200207/102402_DARK.fits'
     )

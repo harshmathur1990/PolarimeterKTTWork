@@ -19,7 +19,7 @@ import pycwt as wavelet
 from pycwt.helpers import find
 import pandas as pd
 import skimage.draw
-
+from utils import timeit, time_measure
 # Then, we load the dataset and define some data related parameters. In this
 # case, the first 19 lines of the data file contain meta-data, that we ignore,
 # since we set them manually (*i.e.* title, units).
@@ -366,6 +366,7 @@ def get_minima_points(
     return left_minima_point, right_minima_point
 
 
+@timeit
 def get_minima_points_alternate(
     power, wave, j, period, coi,
     period_estimate, row_left=None, row_right=None,
@@ -410,19 +411,32 @@ def get_minima_points_alternate(
     else:
         right_minima_point = dips[right_minima_arr[0]]
 
-    # period_of_peak_power = left_minima_point + np.argmax(
-    #     power[left_minima_point: right_minima_point]
-    # )
+    if period_estimate < 0:
+        period_of_peak_power = left_minima_point + np.argmax(
+            power[left_minima_point: right_minima_point]
+        )
 
-    # if row_right and row_left and (
-    #     period_of_peak_power > row_right or
-    #         period_of_peak_power < row_left
-    # ):
-    #     return row_left, row_right
+        if row_right and row_left and (
+            period_of_peak_power > row_right or
+                period_of_peak_power < row_left
+        ):
+            return row_left, row_right
 
     return left_minima_point, right_minima_point
 
 
+@timeit
+def do_icwt(wave, scales, dt, dj, mother, std):
+    return wavelet.icwt(
+        wave,
+        scales,
+        dt,
+        dj,
+        mother
+    ) * std
+
+
+@timeit
 def do_work(
     work_dict, shape_0, shape_1,
     period_estimate=None, kill_coi=True,
@@ -443,99 +457,97 @@ def do_work(
         list(np.arange(ref_row + 1, shape_0))
     )
 
-    old_left_right_dict = defaultdict(dict)
+    old_left_right_dict = np.empty(shape=(shape_0, shape_1), dtype=object)
 
-    for i in first_iter:
-        power = work_dict[i]['power'].copy()
-        wave = work_dict[i]['wave'].copy()
-        scales = work_dict[i]['scales']
-        dt = work_dict[i]['dt']
-        dj = work_dict[i]['dj']
-        mother = work_dict[i]['mother']
-        std = work_dict[i]['std']
-        period = work_dict[i]['period']
-        coi = work_dict[i]['coi']
-        for k in second_iter:
-            if i == ref_row and k == ref_col:
-                prev_col, prev_row = None, None
-            elif i == ref_row:
-                prev_row = None
-                prev_col = k + 1 if k < ref_col else k - 1
-            elif k == ref_col:
-                prev_col = None
-                prev_row = i + 1 if i < ref_row else i - 1
-            else:
-                prev_col = k + 1 if k < ref_col else k - 1
-                prev_row = i + 1 if i < ref_row else i - 1
+    with time_measure('first_iteration'):
+        for i in first_iter:
+            power = work_dict[i]['power'].copy()
+            wave = work_dict[i]['wave'].copy()
+            scales = work_dict[i]['scales']
+            dt = work_dict[i]['dt']
+            dj = work_dict[i]['dj']
+            mother = work_dict[i]['mother']
+            std = work_dict[i]['std']
+            period = work_dict[i]['period']
+            coi = work_dict[i]['coi']
+            with time_measure('second_iteration'):
+                for k in second_iter:
+                    if i == ref_row and k == ref_col:
+                        prev_col, prev_row = None, None
+                    elif i == ref_row:
+                        prev_row = None
+                        prev_col = k + 1 if k < ref_col else k - 1
+                    elif k == ref_col:
+                        prev_col = None
+                        prev_row = i + 1 if i < ref_row else i - 1
+                    else:
+                        prev_col = k + 1 if k < ref_col else k - 1
+                        prev_row = i + 1 if i < ref_row else i - 1
 
-            row_left, row_right = None, None
-            col_left, col_right = None, None
+                    row_left, row_right = None, None
+                    col_left, col_right = None, None
 
-            if prev_row:
-                row_left, row_right = old_left_right_dict[prev_row][k]
+                    if prev_row:
+                        row_left, row_right = old_left_right_dict[prev_row][k]
 
-            if prev_col:
-                col_left, col_right = old_left_right_dict[i][prev_col]
+                    if prev_col:
+                        col_left, col_right = old_left_right_dict[i][prev_col]
 
-            left_minima_point, right_minima_point = get_minima_points_alternate(
-                power,
-                wave,
-                k,
-                period,
-                coi,
-                period_estimate=period_estimate[i][k],
-                row_left=row_left,
-                row_right=row_right,
-                col_left=col_left,
-                col_right=col_right,
-                standard_dev=period_estimate.std()
+                    left_minima_point, right_minima_point = get_minima_points_alternate(
+                        power,
+                        wave,
+                        k,
+                        period,
+                        coi,
+                        period_estimate=period_estimate[i][k],
+                        row_left=row_left,
+                        row_right=row_right,
+                        col_left=col_left,
+                        col_right=col_right,
+                        standard_dev=period_estimate.std()
+                    )
+                    with time_measure('setting dict'):
+                        old_left_right_dict[i][k] = (
+                            left_minima_point, right_minima_point
+                        )
+                    with time_measure('setting zero'):
+                        wave.T[k][0: left_minima_point] = 0
+                        wave.T[k][right_minima_point:] = 0
+                        if kill_coi:
+                            wave.T[k][np.where(period > coi[k])] = 0
+                            power.T[k][np.where(period > coi[k])] = 0
+                        power.T[k][0: left_minima_point] = 0
+                        power.T[k][right_minima_point:] = 0
+                    sys.stdout.write(
+                        'Worked for Row: {} and Column: {}\n'.format(
+                            i, k
+                        )
+                    )
+
+            result_dict[i].update(
+                dat=work_dict[i]['dat'],
+                t=work_dict[i]['t'],
+                period=period,
+                power=power,
+                coi=coi,
+                wave=wave,
+                scales=scales,
+                dt=dt,
+                dj=dj,
+                mother=mother,
+                sig95=work_dict[i]['sig95'],
+                glbl_power=work_dict[i]['glbl_power'],
+                glbl_signif=work_dict[i]['glbl_signif'],
+                scale_avg_signif=work_dict[i]['scale_avg_signif'],
+                scale_avg=work_dict[i]['scale_avg'],
+                std=work_dict[i]['std'],
+                iwave=work_dict[i]['iwave'],
+                var=work_dict[i]['var'],
+                fft_theor=work_dict[i]['fft_theor'],
+                fft_power=work_dict[i]['fft_power'],
+                fftfreqs=work_dict[i]['fftfreqs']
             )
-            old_left_right_dict[i][k] = (
-                left_minima_point, right_minima_point
-            )
-            wave.T[k][0: left_minima_point] = 0
-            wave.T[k][right_minima_point:] = 0
-            if kill_coi:
-                wave.T[k][np.where(period > coi[k])] = 0
-                power.T[k][np.where(period > coi[k])] = 0
-            power.T[k][0: left_minima_point] = 0
-            power.T[k][right_minima_point:] = 0
-            sys.stdout.write(
-                'Worked for Row: {} and Column: {}\n'.format(
-                    i, k
-                )
-            )
-
-        result_dict[i].update(
-            dat=work_dict[i]['dat'],
-            t=work_dict[i]['t'],
-            period=period,
-            power=power,
-            coi=coi,
-            wave=wave,
-            scales=scales,
-            dt=dt,
-            dj=dj,
-            mother=mother,
-            sig95=work_dict[i]['sig95'],
-            glbl_power=work_dict[i]['glbl_power'],
-            glbl_signif=work_dict[i]['glbl_signif'],
-            scale_avg_signif=work_dict[i]['scale_avg_signif'],
-            scale_avg=work_dict[i]['scale_avg'],
-            std=work_dict[i]['std'],
-            iwave=work_dict[i]['iwave'],
-            var=work_dict[i]['var'],
-            fft_theor=work_dict[i]['fft_theor'],
-            fft_power=work_dict[i]['fft_power'],
-            fftfreqs=work_dict[i]['fftfreqs']
-        )
-        result[i] = wavelet.icwt(
-            wave,
-            scales,
-            dt,
-            dj,
-            mother
-        ) * std
+            result[i] = do_icwt(wave, scales, dt, dj, mother, std)
 
     return result, result_dict, old_left_right_dict
 
@@ -570,6 +582,7 @@ def clean_data(result, kernel=7):
     return res
 
 
+@timeit
 def do_wavelet_over_image(image):
 
     first_iteration = np.array(
