@@ -555,10 +555,10 @@ def get_flat_profile(flat_filename):
     return scipy.ndimage.gaussian_filter1d(flat_profile, 1)
 
 
-def get_efficiency_vector(modulation_matrix, modulation_samples=4):
+def get_efficiency_vector(modulation_matrix):
     demod = get_demodulation_matrix(modulation_matrix)
     return 1 / np.sqrt(
-        modulation_samples * np.sum(
+        modulation_matrix.shape[0] * np.sum(
             np.square(demod),
             axis=1
         )
