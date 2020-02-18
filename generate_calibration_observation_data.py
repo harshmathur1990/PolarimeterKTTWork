@@ -4,7 +4,7 @@ import sunpy.io.fits
 from dark_master_generate import apply_x_shift, apply_y_shift
 
 
-write_path = Path('/Volumes/Harsh 9599771751/Kodai Visit Processed/20200208')
+write_path = Path('/Volumes/Harsh 9599771751/Kodai Visit Processed/20200210')
 
 
 def get_keys_from_name(filepath):
@@ -145,13 +145,13 @@ def save_observation_data(
 
 if __name__ == '__main__':
     calibration_folder = Path(
-        '/Volumes/Harsh 9599771751/Kodai Visit ' +
-        '31 Jan - 12 Feb/20200208/Calibration/093428'
+        '/Volumes/Harsh 9599771751/Kodai Visit 31 ' +
+        'Jan - 12 Feb/20200210/Calibration/085755'
     )
 
     observation_folder_0 = Path(
-        '/Volumes/Harsh 9599771751/Kodai Visit ' +
-        '31 Jan - 12 Feb/20200208/Observation/094708'
+        '/Volumes/Harsh 9599771751/Kodai Visit 31 ' +
+        'Jan - 12 Feb/20200210/Observation/084457'
     )
 
     # observation_folder_1 = Path(
@@ -160,23 +160,23 @@ if __name__ == '__main__':
     # )
 
     x_inclination_file = Path(
-        '/Volumes/Harsh 9599771751/Kodai Visit' +
-        ' Processed/20200208/x_inclinations.txt'
+        '/Volumes/Harsh 9599771751/Kodai Visit ' +
+        'Processed/20200210/x_inclinations.txt'
     )
 
     y_inclination_file = Path(
-        '/Volumes/Harsh 9599771751/Kodai Visit' +
-        ' Processed/20200208/y_inclinations.txt'
+        '/Volumes/Harsh 9599771751/Kodai Visit ' +
+        'Processed/20200210/y_inclinations.txt'
     )
 
     flat_master = Path(
-        '/Volumes/Harsh 9599771751/Kodai Visit' +
-        ' Processed/20200208/100306_FLATFLATMASTER.fits'
+        '/Volumes/Harsh 9599771751/Kodai Visit ' +
+        'Processed/20200210/103705_FLATFLATMASTER.fits'
     )
 
     dark_master = Path(
-        '/Users/harshmathur/Documents/CourseworkRepo' +
-        '/Kodai Visit/20200207/102402_DARK.fits'
+        '/Volumes/Harsh 9599771751/Kodai Visit ' +
+        'Processed/20200210/102402_DARK.fits'
     )
 
     save_calibration_data(

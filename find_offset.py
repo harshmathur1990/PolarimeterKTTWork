@@ -136,10 +136,12 @@ def read_file_for_observations(filename, top_cut=530, bot_cut=560):
     )
 
 
-def read_file(calib_filename):
+def read_file(
+    calib_filename,
+    x1=692, x2=835, y1=477, y2=739, BEAMSEP=512
+):
     data, header = sunpy.io.fits.read(calib_filename)[0]
-    BEAMSEP = 512
-    PTS = [[477, 692], [739, 835]]
+    PTS = [[y1, x1], [y2, x2]]
     ROI = [list(map(int, i)) for i in PTS]
     ROI_TOP = np.copy(ROI)
     ROI_BOT = np.copy(ROI_TOP)
@@ -551,6 +553,16 @@ def get_flat_profile(flat_filename):
     flat_profile = np.loadtxt(flat_filename)
 
     return scipy.ndimage.gaussian_filter1d(flat_profile, 1)
+
+
+def get_efficiency_vector(modulation_matrix, modulation_samples=4):
+    demod = get_demodulation_matrix(modulation_matrix)
+    return 1 / np.sqrt(
+        modulation_samples * np.sum(
+            np.square(demod),
+            axis=1
+        )
+    )
 
 
 if __name__ == '__main__':
