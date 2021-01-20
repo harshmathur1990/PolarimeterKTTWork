@@ -11,7 +11,8 @@ import matplotlib.pyplot as plt
 # write_path = Path('/Users/harshmathur/Documents/CourseworkRepo/Kodai Visit/20200207')
 # write_path = Path('/Users/harshmathur/Documents/CourseworkRepo/Level-1')
 # write_path = Path('/Volumes/Harsh 9599771751/Kodai Visit Processed/20200208')
-write_path = Path('/Volumes/Harsh 9599771751/Kodai Visit Processed/20200210')
+# write_path = Path('/Volumes/Harsh 9599771751/Kodai Visit Processed/20200210')
+write_path = Path('/Volumes/Harsh 9599771751/Kodai Visit Processed/20190419')
 
 
 def generate_master_dark(dark_filename):
@@ -361,13 +362,13 @@ def get_master_flat_x_y_inclinations_and_line_profile(
 
 if __name__ == '__main__':
     dark_filename = Path(
-        '/Volumes/Harsh 9599771751/Kodai Visit 31' +
-        ' Jan - 12 Feb/20200204/Darks/102402_DARK.fits'
+        '/Volumes/Harsh 9599771751/Spectropolarimetric ' +
+        'Data Kodaikanal/2019/20190413/Darks/083651_DARK.fits'
     )
 
     flat_filename = Path(
-        '/Volumes/Harsh 9599771751/Kodai Visit 31 ' +
-        'Jan - 12 Feb/20200210/Flats/090931_FLAT.fits'
+        '/Volumes/Harsh 9599771751/Spectropolarimetric ' +
+        'Data Kodaikanal/2019/20190413/Flats/083523_FLAT.fits'
     )
 
     fringe_filename = Path(
@@ -382,5 +383,5 @@ if __name__ == '__main__':
 
     dark_master = Path(
         '/Volumes/Harsh 9599771751/Kodai Visit ' +
-        'Processed/20200210/102402_DARK.fits'
+        'Processed/20190419/083651_DARK.fits'
     )

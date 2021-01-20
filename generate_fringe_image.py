@@ -152,7 +152,7 @@ def plot_wavelet_trandform(
     cx.set_ylim(np.log2([period.min(), period.max()]))
     cx.set_yticks(np.log2(Yticks))
     cx.set_yticklabels(Yticks)
-    plt.setp(cx.get_yticklabels(), visible=False)
+    plt.setp(cx.get_yticklabels())
 
     # Fourth sub-plot, the scale averaged wavelet spectrum.
     dx = plt.axes([0.1, 0.07, 0.65, 0.2], sharex=ax)
