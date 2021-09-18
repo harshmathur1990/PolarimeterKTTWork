@@ -4,7 +4,8 @@ import sunpy.io.fits
 from dark_master_generate import apply_x_shift, apply_y_shift
 
 
-write_path = Path('/Volumes/Harsh 9599771751/Kodai Visit Processed/20200210')
+# write_path = Path('/Volumes/Harsh 9599771751/Kodai Visit Processed/20200210')
+write_path = Path('/Volumes/Harsh 9599771751/Kodai Visit Processed/20190419')
 
 
 def get_keys_from_name(filepath):
@@ -18,7 +19,7 @@ def get_keys_from_name(filepath):
 
 def get_calib_key_from_name(filepath):
     keys = get_keys_from_name(filepath)
-    return keys[0], keys[1]
+    return keys[1], keys[0]
 
 
 def get_observation_key_from_name(filepath):
@@ -145,13 +146,13 @@ def save_observation_data(
 
 if __name__ == '__main__':
     calibration_folder = Path(
-        '/Volumes/Harsh 9599771751/Kodai Visit 31 ' +
-        'Jan - 12 Feb/20200210/Calibration/085755'
+        '/Volumes/Harsh 9599771751/Spectropolarimetric ' +
+        'Data Kodaikanal/2019/20190413/CalibrationAlt/093027'
     )
 
     observation_folder_0 = Path(
-        '/Volumes/Harsh 9599771751/Kodai Visit 31 ' +
-        'Jan - 12 Feb/20200210/Observation/084457'
+        '/Volumes/Harsh 9599771751/Spectropolarimetric ' +
+        'Data Kodaikanal/2019/20190413/Observation/080619'
     )
 
     # observation_folder_1 = Path(
@@ -161,22 +162,22 @@ if __name__ == '__main__':
 
     x_inclination_file = Path(
         '/Volumes/Harsh 9599771751/Kodai Visit ' +
-        'Processed/20200210/x_inclinations.txt'
+        'Processed/20190419/x_inclinations.txt'
     )
 
     y_inclination_file = Path(
         '/Volumes/Harsh 9599771751/Kodai Visit ' +
-        'Processed/20200210/y_inclinations.txt'
+        'Processed/20190419/y_inclinations.txt'
     )
 
     flat_master = Path(
         '/Volumes/Harsh 9599771751/Kodai Visit ' +
-        'Processed/20200210/103705_FLATFLATMASTER.fits'
+        'Processed/20190419/083523_FLATFLATMASTER.fits'
     )
 
     dark_master = Path(
         '/Volumes/Harsh 9599771751/Kodai Visit ' +
-        'Processed/20200210/102402_DARK.fits'
+        'Processed/20190419/083651_DARK.fits'
     )
 
     save_calibration_data(
