@@ -79,13 +79,13 @@ def get_input_stokes(offset=0):
     return stokes_res.astype(np.float64)
 
 
-def get_modulation_matrix(config, wavelength=8542):
+def get_modulation_matrix(config, original_wavelength=8542, wavelength=8542):
 
     modulation_matrix_top = None
     modulation_matrix_bottom = None
 
-    quarter_retardation = 2 * np.pi * 0.249 * 8542 / wavelength
-    half_retardation = 2 * np.pi * 0.249 * 2 * 8542 / wavelength
+    quarter_retardation = 2 * np.pi * 0.249 * original_wavelength / wavelength
+    half_retardation = 2 * np.pi * 0.249 * 2 * original_wavelength / wavelength
 
     qwp_matrix_func = get_waveplate_matrix(quarter_retardation)
     hwp_matrix_func = get_waveplate_matrix(half_retardation)
@@ -142,6 +142,116 @@ def get_modulation_matrix(config, wavelength=8542):
 
     return modulation_matrix_top.astype(np.float64), \
         modulation_matrix_bottom.astype(np.float64)
+
+
+def prepare_modulation_matrix_minimisation_function(
+    original_wavelength=8542, wavelength_1=8542.12, wavelength_2=6562.8
+):
+    def modulation_matrix_minimisation_function(config):
+
+        optimum_mod_matrix = np.array(
+            [
+                [1., -0.57005914, 0.58262066, -0.57929763],
+                [1., 0.57954106, -0.57321769, -0.57926992],
+                [1., -0.58776753, -0.56491227, 0.57914028],
+                [1., 0.56807082, 0.58468793, 0.57916799]
+            ]
+        )
+
+        modulation_matrix_top_wave = np.zeros((len(config) // 2, 4))
+        modulation_matrix_top_ori_wave = np.zeros((len(config) // 2, 4))
+
+        quarter_retardation_wave = 2 * np.pi * 0.249 * original_wavelength / wavelength_1
+        half_retardation_wave = 2 * np.pi * 0.249 * 2 * original_wavelength / wavelength_1
+
+        quarter_retardation_ori_wave = 2 * np.pi * 0.249 * original_wavelength / wavelength_2
+        half_retardation_ori_wave = 2 * np.pi * 0.249 * 2 * original_wavelength / wavelength_2
+
+        qwp_matrix_func_wave = get_waveplate_matrix(quarter_retardation_wave)
+        hwp_matrix_func_wave = get_waveplate_matrix(half_retardation_wave)
+
+        qwp_matrix_func_ori_wave = get_waveplate_matrix(quarter_retardation_ori_wave)
+        hwp_matrix_func_ori_wave = get_waveplate_matrix(half_retardation_ori_wave)
+
+        top_retarder = get_linear_polarizer(1)
+
+        for index in range(0, len(config), 2):
+            qwp_angle = np.radians(config[index])
+            hwp_angle = np.radians(config[index + 1])
+
+            qwp_matrix_wave = qwp_matrix_func_wave(qwp_angle)
+            hwp_matrix_wave = hwp_matrix_func_wave(hwp_angle)
+
+            qwp_matrix_ori_wave = qwp_matrix_func_ori_wave(qwp_angle)
+            hwp_matrix_ori_wave = hwp_matrix_func_ori_wave(hwp_angle)
+
+            mueller_matrix_top_wave = np.matmul(
+                np.matmul(
+                    top_retarder,
+                    hwp_matrix_wave
+                ),
+                qwp_matrix_wave
+            )
+
+            mueller_matrix_top_ori_wave = np.matmul(
+                np.matmul(
+                    top_retarder,
+                    hwp_matrix_ori_wave
+                ),
+                qwp_matrix_ori_wave
+            )
+
+            modulation_matrix_top_wave[index // 2] = mueller_matrix_top_wave[0]
+            modulation_matrix_top_ori_wave[index // 2] = mueller_matrix_top_ori_wave[0]
+
+        penalty = 0
+
+        for i in range(1, 4):
+            for j in range(1, 4):
+                if np.abs(modulation_matrix_top_wave[i, j]) < 0.4:
+                    penalty += np.square(
+                        0.4 - np.abs(modulation_matrix_top_wave[i, j])
+                    )
+                if np.abs(modulation_matrix_top_wave[i, j]) > 0.6:
+                    penalty += np.square(
+                        np.abs(modulation_matrix_top_wave[i, j]) - 0.6
+                    )
+                if np.abs(modulation_matrix_top_ori_wave[i, j]) < 0.4:
+                    penalty += np.square(
+                        0.4 - np.abs(modulation_matrix_top_ori_wave[i, j])
+                    )
+                if np.abs(modulation_matrix_top_ori_wave[i, j]) > 0.6:
+                    penalty += np.square(
+                        np.abs(modulation_matrix_top_ori_wave[i, j]) - 0.6
+                    )
+
+        penalty = np.sqrt(penalty)
+
+        merit_value = np.sqrt(
+            np.sum(
+                np.square(
+                    np.subtract(
+                        np.abs(optimum_mod_matrix),
+                        np.abs(modulation_matrix_top_wave)
+                    )
+                )
+            )
+        ) + np.sqrt(
+            np.sum(
+                np.square(
+                    np.subtract(
+                        np.abs(optimum_mod_matrix),
+                        np.abs(modulation_matrix_top_ori_wave)
+                    )
+                )
+            )
+        )
+
+        print (merit_value, penalty)
+
+        return merit_value + penalty
+
+    return modulation_matrix_minimisation_function
 
 
 def get_modulated_intensity(offset=0, wavelength=8542):

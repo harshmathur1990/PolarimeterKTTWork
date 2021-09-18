@@ -4,8 +4,9 @@ import sunpy.io.fits
 from dark_master_generate import apply_x_shift, apply_y_shift
 
 
-# write_path = Path('/Volumes/Harsh 9599771751/Kodai Visit Processed/20200210')
-write_path = Path('/Volumes/Harsh 9599771751/Kodai Visit Processed/20190419')
+
+write_path = Path('/Volumes/Harsh9599771751/Kodai Visit Processed/20210319')
+
 
 
 def get_keys_from_name(filepath):
@@ -151,8 +152,11 @@ if __name__ == '__main__':
     )
 
     observation_folder_0 = Path(
-        '/Volumes/Harsh 9599771751/Spectropolarimetric ' +
-        'Data Kodaikanal/2019/20190413/Observation/080619'
+    '/Volumes/Harsh9599771751/Kodai Visit March2021/20210319/Calibration/111757'
+    )
+
+    observation_folder = Path(
+    '/Volumes/Harsh9599771751/Kodai Visit March2021/20210319/Scan/120233'
     )
 
     # observation_folder_1 = Path(
@@ -178,7 +182,6 @@ if __name__ == '__main__':
     dark_master = Path(
         '/Volumes/Harsh 9599771751/Kodai Visit ' +
         'Processed/20190419/083651_DARK.fits'
-    )
 
     save_calibration_data(
         calibration_folder,

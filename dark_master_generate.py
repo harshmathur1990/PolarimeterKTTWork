@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 write_path = Path('/Volumes/Harsh 9599771751/Kodai Visit Processed/20190419')
 
 
-def generate_master_dark(dark_filename):
+def generate_master_dark(dark_filename, write_path):
     data, header = sunpy.io.fits.read(dark_filename)[0]
     average_data = np.average(data, axis=0)
     smoothed_data = scipy.signal.medfilt2d(average_data, kernel_size=3)
@@ -31,7 +31,7 @@ def generate_master_dark(dark_filename):
     sunpy.io.fits.write(save_path, smoothed_data, header)
 
 
-def generate_fringe_flat(fringe_filename, dark_master):
+def generate_fringe_flat(fringe_filename, dark_master, write_path):
     data, header = sunpy.io.fits.read(fringe_filename)[0]
 
     fringe_data = np.mean(data, axis=0)
@@ -87,7 +87,7 @@ def generate_fringe_flat(fringe_filename, dark_master):
 
 
 def get_y_shift(x_corrected_flat):
-    max_shift, extent, up_sampling = 5, 20, 10
+    max_shift, extent, up_sampling = 50, 20, 10
 
     no_of_vertical_pixels = x_corrected_flat.shape[0]
 
@@ -177,7 +177,7 @@ def get_y_shift(x_corrected_flat):
 
 
 def get_x_shift(dark_corrected_flat):
-    max_shift, extent, up_sampling = 10, 20, 10
+    max_shift, extent, up_sampling = 50, 20, 10
 
     no_of_horizontal_pixels = dark_corrected_flat.shape[1]
 
@@ -312,7 +312,7 @@ def remove_line_profile(inclination_corrected_flat):
 
 
 def get_master_flat_x_y_inclinations_and_line_profile(
-    flat_filename, dark_master, fringe_master
+    flat_filename, dark_master, fringe_master, write_path
 ):
     flat_data, flat_header = sunpy.io.fits.read(flat_filename)[0]
     dark_data, dark_header = sunpy.io.fits.read(dark_master)[0]
@@ -360,28 +360,33 @@ def get_master_flat_x_y_inclinations_and_line_profile(
     np.savetxt(write_path / 'flat_profile.txt', line_median)
 
 
-if __name__ == '__main__':
-    dark_filename = Path(
-        '/Volumes/Harsh 9599771751/Spectropolarimetric ' +
-        'Data Kodaikanal/2019/20190413/Darks/083651_DARK.fits'
-    )
 
-    flat_filename = Path(
-        '/Volumes/Harsh 9599771751/Spectropolarimetric ' +
-        'Data Kodaikanal/2019/20190413/Flats/083523_FLAT.fits'
-    )
 
-    fringe_filename = Path(
-        '/Volumes/Harsh 9599771751/Kodai Visit ' +
-        '31 Jan - 12 Feb/20200207/Flats/082259_FLAT.fits'
-    )
+# if __name__ == '__main__':
+#     dark_filename = Path(
+#         '/Volumes/Harsh 9599771751/Spectropolarimetric ' +
+#         'Data Kodaikanal/2019/20190413/Darks/083651_DARK.fits'
+#     )
 
-    fringe_master = Path(
-        '/Users/harshmathur/Documents/CourseworkRepo' +
-        '/Kodai Visit/20200204/103556_FLATFRINGEFLAT.fits'
-    )
+#     flat_filename = Path(
+#         '/Volumes/Harsh 9599771751/Spectropolarimetric ' +
+#         'Data Kodaikanal/2019/20190413/Flats/083523_FLAT.fits'
+#     )
 
-    dark_master = Path(
-        '/Volumes/Harsh 9599771751/Kodai Visit ' +
-        'Processed/20190419/083651_DARK.fits'
-    )
+
+#     fringe_filename = Path(
+#         '/Volumes/Harsh 9599771751/Kodai Visit ' +
+#         '31 Jan - 12 Feb/20200207/Flats/082259_FLAT.fits'
+#     )
+
+#     fringe_master = Path(
+#         '/Users/harshmathur/Documents/CourseworkRepo' +
+#         '/Kodai Visit/20200204/103556_FLATFRINGEFLAT.fits'
+#     )
+
+
+#     dark_master = Path(
+#         '/Volumes/Harsh 9599771751/Kodai Visit ' +
+#         'Processed/20190419/083651_DARK.fits'
+#     )
+

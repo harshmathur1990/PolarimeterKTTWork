@@ -6,7 +6,7 @@ import modulation_matrix as mm
 import sunpy.io.fits
 import matplotlib.pyplot as plt
 
-write_path = Path('/Users/harshmathur/CourseworkRepo/Level-1')
+# write_path = Path('/Users/harshmathur/CourseworkRepo/Level-1')
 
 
 def normalise_modulation_matrix(mod_matrix):
