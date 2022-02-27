@@ -1,3 +1,5 @@
+import sys
+sys.path.insert(2, '/home/harsh/CourseworkRepo/SSPVerify')
 from pathlib import Path
 import numpy as np
 import sunpy.io.fits
@@ -5,7 +7,8 @@ from dark_master_generate import apply_x_shift, apply_y_shift
 
 
 
-write_path = Path('/Volumes/Harsh9599771751/Kodai Visit Processed/20210319')
+# write_path = Path('/Volumes/Harsh9599771751/Kodai Visit Processed/20210319')
+write_path = Path('/home/harsh/Flat Data 8662/flat_calculation/')
 
 
 
@@ -105,7 +108,9 @@ def save_calibration_data(
     )
 
     sunpy.io.fits.write(
-        write_path / 'calib_data.fits',
+        write_path / 'calib_data_{}.fits'.format(
+            calibration_folder.name
+        ),
         resultant,
         header,
         overwrite=True
@@ -145,66 +150,66 @@ def save_observation_data(
     )
 
 
-if __name__ == '__main__':
-    calibration_folder = Path(
-        '/Volumes/Harsh 9599771751/Spectropolarimetric ' +
-        'Data Kodaikanal/2019/20190413/CalibrationAlt/093027'
-    )
+# if __name__ == '__main__':
+#     calibration_folder = Path(
+#         '/Volumes/Harsh 9599771751/Spectropolarimetric ' +
+#         'Data Kodaikanal/2019/20190413/CalibrationAlt/093027'
+#     )
 
-    observation_folder_0 = Path(
-    '/Volumes/Harsh9599771751/Kodai Visit March2021/20210319/Calibration/111757'
-    )
+#     observation_folder_0 = Path(
+#     '/Volumes/Harsh9599771751/Kodai Visit March2021/20210319/Calibration/111757'
+#     )
 
-    observation_folder = Path(
-    '/Volumes/Harsh9599771751/Kodai Visit March2021/20210319/Scan/120233'
-    )
+#     observation_folder = Path(
+#     '/Volumes/Harsh9599771751/Kodai Visit March2021/20210319/Scan/120233'
+#     )
 
-    # observation_folder_1 = Path(
-    #     '/Volumes/Harsh 9599771751/Kodai Visit 31 Jan' +
-    #     ' - 12 Feb/20200206/Observation/095044'
-    # )
+#     # observation_folder_1 = Path(
+#     #     '/Volumes/Harsh 9599771751/Kodai Visit 31 Jan' +
+#     #     ' - 12 Feb/20200206/Observation/095044'
+#     # )
 
-    x_inclination_file = Path(
-        '/Volumes/Harsh 9599771751/Kodai Visit ' +
-        'Processed/20190419/x_inclinations.txt'
-    )
+#     x_inclination_file = Path(
+#         '/Volumes/Harsh 9599771751/Kodai Visit ' +
+#         'Processed/20190419/x_inclinations.txt'
+#     )
 
-    y_inclination_file = Path(
-        '/Volumes/Harsh 9599771751/Kodai Visit ' +
-        'Processed/20190419/y_inclinations.txt'
-    )
+#     y_inclination_file = Path(
+#         '/Volumes/Harsh 9599771751/Kodai Visit ' +
+#         'Processed/20190419/y_inclinations.txt'
+#     )
 
-    flat_master = Path(
-        '/Volumes/Harsh 9599771751/Kodai Visit ' +
-        'Processed/20190419/083523_FLATFLATMASTER.fits'
-    )
+#     flat_master = Path(
+#         '/Volumes/Harsh 9599771751/Kodai Visit ' +
+#         'Processed/20190419/083523_FLATFLATMASTER.fits'
+#     )
 
-    dark_master = Path(
-        '/Volumes/Harsh 9599771751/Kodai Visit ' +
-        'Processed/20190419/083651_DARK.fits'
+#     dark_master = Path(
+#         '/Volumes/Harsh 9599771751/Kodai Visit ' +
+#         'Processed/20190419/083651_DARK.fits'
 
-    save_calibration_data(
-        calibration_folder,
-        x_inclination_file,
-        y_inclination_file,
-        flat_master,
-        dark_master
-    )
+#     save_calibration_data(
+#         calibration_folder,
+#         x_inclination_file,
+#         y_inclination_file,
+#         flat_master,
+#         dark_master
+#     )
 
-    save_observation_data(
-        observation_folder_0,
-        x_inclination_file,
-        y_inclination_file,
-        flat_master,
-        dark_master,
-        index=0
-    )
+#     save_observation_data(
+#         observation_folder_0,
+#         x_inclination_file,
+#         y_inclination_file,
+#         flat_master,
+#         dark_master,
+#         index=0
+#     )
 
-    # save_observation_data(
-    #     observation_folder_1,
-    #     x_inclination_file,
-    #     y_inclination_file,
-    #     flat_master,
-    #     dark_master,
-    #     index=1
-    # )
+#     # save_observation_data(
+#     #     observation_folder_1,
+#     #     x_inclination_file,
+#     #     y_inclination_file,
+#     #     flat_master,
+#     #     dark_master,
+#     #     index=1
+#     # )

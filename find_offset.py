@@ -73,11 +73,11 @@ def get_modulation_matrix(offset, top_beam, bottom_beam):
 
 def reduce_offset(
     offset_range_start, offset_range_end,
-    step, top_beam, bottom_beam, wavelength=8542
+    step, top_beam, bottom_beam, wavelength=8662, original_wavelength=8542
 ):
 
     im_top, im_bot = mm.get_modulation_matrix(
-        mm.config, wavelength=wavelength
+        mm.config, wavelength=wavelength,original_wavelength=original_wavelength
     )
 
     im_top = im_top.astype(np.float64)
@@ -155,7 +155,7 @@ def read_file(
         data[:, ROI_BOT[0][1]:ROI_BOT[1][1], ROI_BOT[0][0]:ROI_BOT[1][0]],
         (1, 2)
     )
-    return INTENSITY_TOP.reshape(24, 4).T, INTENSITY_BOT.reshape(24, 4).T
+    return INTENSITY_TOP, INTENSITY_BOT
 
 
 def get_demodulation_matrix(mod_matrix):
@@ -469,10 +469,8 @@ def get_response_matrix_add_subtract(filename):
     return response_matrix_top, response_matrix_bot, res_offset
 
 
-def execute(filename, offset_start, offset_end, step):
+def execute(filename):
     top_beam, bottom_beam = read_file(filename)
-
-    total_intensity = top_beam + bottom_beam
 
     top_beam = top_beam * 2 / np.max(top_beam)
 
@@ -481,10 +479,6 @@ def execute(filename, offset_start, offset_end, step):
     intensity_top_theory, intensity_bot_theory = mm.get_modulated_intensity(
         offset=0
     )
-
-    total_intensity_theory = intensity_top_theory + intensity_bot_theory
-
-    total_intensity = total_intensity * 2 / np.max(total_intensity)
 
     plot_beam(
         'Total Beam',
@@ -565,27 +559,27 @@ def get_efficiency_vector(modulation_matrix):
     )
 
 
-if __name__ == '__main__':
-    calib_filename = '/Users/harshmathur/Documents/' + \
-        'CourseworkRepo/Level-1/calib_data.fits'
+# if __name__ == '__main__':
+#     calib_filename = '/Users/harshmathur/Documents/' + \
+#         'CourseworkRepo/Level-1/calib_data.fits'
 
-    observation_filename = '/Users/harshmathur/Documents/' + \
-        'CourseworkRepo/Level-1/observation_data.fits'
+#     observation_filename = '/Users/harshmathur/Documents/' + \
+#         'CourseworkRepo/Level-1/observation_data.fits'
 
-    real_stokes_top, real_stokes_bot = get_measured_stokes_observations(
-        observation_filename, calib_filename
-    )
+#     real_stokes_top, real_stokes_bot = get_measured_stokes_observations(
+#         observation_filename, calib_filename
+#     )
 
-    stokes_filename = '/Users/harshmathur/CourseworkRepo/' + \
-        'Level-1/20190413_093058_STOKESDATA.fits'
+#     stokes_filename = '/Users/harshmathur/CourseworkRepo/' + \
+#         'Level-1/20190413_093058_STOKESDATA.fits'
 
-    flat_filename = '/Users/harshmathur/CourseworkRepo/' + \
-        'Level-1/20190413_083523_LINEPROFILE.txt'
+#     flat_filename = '/Users/harshmathur/CourseworkRepo/' + \
+#         'Level-1/20190413_083523_LINEPROFILE.txt'
 
-    header = sunpy.io.read_file_header(observation_filename)[0]
+#     header = sunpy.io.read_file_header(observation_filename)[0]
 
-    get_final_stokes_from_real_stokes(
-        real_stokes_top,
-        real_stokes_bot,
-        header
-    )
+#     get_final_stokes_from_real_stokes(
+#         real_stokes_top,
+#         real_stokes_bot,
+#         header
+#     )

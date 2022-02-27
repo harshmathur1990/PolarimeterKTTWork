@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.optimize import minimize
 
 
 config = [[-22.5, 42.6], [-22.5, 69.9], [22.5, 47.4], [22.5, 20.1]]
@@ -144,6 +145,14 @@ def get_modulation_matrix(config, original_wavelength=8542, wavelength=8542):
         modulation_matrix_bottom.astype(np.float64)
 
 
+def calculate_efficiency_for_mod_matrix(mod_matrix):
+    A = np.dot(mod_matrix.T, mod_matrix)
+
+    B = np.linalg.inv(A)
+
+    return 1/np.sqrt(4 * np.diag(B))
+
+
 def prepare_modulation_matrix_minimisation_function(
     original_wavelength=8542, wavelength_1=8542.12, wavelength_2=6562.8
 ):
@@ -204,54 +213,119 @@ def prepare_modulation_matrix_minimisation_function(
             modulation_matrix_top_wave[index // 2] = mueller_matrix_top_wave[0]
             modulation_matrix_top_ori_wave[index // 2] = mueller_matrix_top_ori_wave[0]
 
-        penalty = 0
+        # penalty = 0
 
-        for i in range(1, 4):
-            for j in range(1, 4):
-                if np.abs(modulation_matrix_top_wave[i, j]) < 0.4:
-                    penalty += np.square(
-                        0.4 - np.abs(modulation_matrix_top_wave[i, j])
-                    )
-                if np.abs(modulation_matrix_top_wave[i, j]) > 0.6:
-                    penalty += np.square(
-                        np.abs(modulation_matrix_top_wave[i, j]) - 0.6
-                    )
-                if np.abs(modulation_matrix_top_ori_wave[i, j]) < 0.4:
-                    penalty += np.square(
-                        0.4 - np.abs(modulation_matrix_top_ori_wave[i, j])
-                    )
-                if np.abs(modulation_matrix_top_ori_wave[i, j]) > 0.6:
-                    penalty += np.square(
-                        np.abs(modulation_matrix_top_ori_wave[i, j]) - 0.6
-                    )
+        # for i in range(1, 4):
+        #     for j in range(1, 4):
+        #         if np.abs(modulation_matrix_top_wave[i, j]) < 0.4:
+        #             penalty += np.square(
+        #                 0.4 - np.abs(modulation_matrix_top_wave[i, j])
+        #             )
+        #         if np.abs(modulation_matrix_top_wave[i, j]) > 0.6:
+        #             penalty += np.square(
+        #                 np.abs(modulation_matrix_top_wave[i, j]) - 0.6
+        #             )
+        #         if np.abs(modulation_matrix_top_ori_wave[i, j]) < 0.4:
+        #             penalty += np.square(
+        #                 0.4 - np.abs(modulation_matrix_top_ori_wave[i, j])
+        #             )
+        #         if np.abs(modulation_matrix_top_ori_wave[i, j]) > 0.6:
+        #             penalty += np.square(
+        #                 np.abs(modulation_matrix_top_ori_wave[i, j]) - 0.6
+        #             )
 
-        penalty = np.sqrt(penalty)
+        # penalty = np.sqrt(penalty)
 
-        merit_value = np.sqrt(
-            np.sum(
-                np.square(
-                    np.subtract(
-                        np.abs(optimum_mod_matrix),
-                        np.abs(modulation_matrix_top_wave)
-                    )
-                )
-            )
-        ) + np.sqrt(
-            np.sum(
-                np.square(
-                    np.subtract(
-                        np.abs(optimum_mod_matrix),
-                        np.abs(modulation_matrix_top_ori_wave)
-                    )
-                )
-            )
+        # merit_value = np.sqrt(
+        #     np.sum(
+        #         np.square(
+        #             np.subtract(
+        #                 np.abs(optimum_mod_matrix),
+        #                 np.abs(modulation_matrix_top_wave)
+        #             )
+        #         )
+        #     )
+        # ) + np.sqrt(
+        #     np.sum(
+        #         np.square(
+        #             np.subtract(
+        #                 np.abs(optimum_mod_matrix),
+        #                 np.abs(modulation_matrix_top_ori_wave)
+        #             )
+        #         )
+        #     )
+        # )
+
+        # print (merit_value, penalty)
+
+        efficiency_vec_top = calculate_efficiency_for_mod_matrix(
+            modulation_matrix_top_wave
         )
 
-        print (merit_value, penalty)
+        efficiency_vec_ori_top = calculate_efficiency_for_mod_matrix(
+            modulation_matrix_top_ori_wave
+        )
 
-        return merit_value + penalty
+        sys.stdout.write('Wave 1: {}, {}, {}, {}\t'.format(*list(efficiency_vec_top)))
+        sys.stdout.write('Wave 2: {}, {}, {}, {}\n'.format(*list(efficiency_vec_ori_top)))
+
+        return np.sum(1/efficiency_vec_top) + np.sum(1/efficiency_vec_ori_top)
 
     return modulation_matrix_minimisation_function
+
+
+def find_modulation_scheme():
+    modulation_matrix_minimisation_function = prepare_modulation_matrix_minimisation_function(
+        original_wavelength=6300,
+        wavelength_1=6563,
+        wavelength_2=8662
+    )
+
+    res = minimize(
+        modulation_matrix_minimisation_function,
+        config,
+        method='Nelder-Mead',
+        tol=1e-6,
+        options={
+            'maxiter': 30000
+        }
+    )
+
+    cfg = res.x.reshape(4, 2)
+
+    '''
+    In [107]: cfg
+    Out[107]: 
+    array([[-68.10399891,  17.62235885],
+           [-30.73527284, 106.02538276],
+           [ 62.40551554,  71.15438246],
+           [  9.76832059,  57.16230412]])
+
+    In [108]: get_modulation_matrix(cfg, original_wavelength=6300, wavelength=6562)
+    Out[108]: 
+    (array([[ 1.        ,  0.67782261,  0.58275496, -0.44827799],
+            [ 1.        , -0.29009536,  0.49873564,  0.81676646],
+            [ 1.        ,  0.44698922, -0.83019619,  0.33312899],
+            [ 1.        , -0.84579809, -0.20331839, -0.49324155]]),
+     array([[ 1.        , -0.67782261, -0.58275496,  0.44827799],
+            [ 1.        ,  0.29009536, -0.49873564, -0.81676646],
+            [ 1.        , -0.44698922,  0.83019619, -0.33312899],
+            [ 1.        ,  0.84579809,  0.20331839,  0.49324155]]))
+
+    In [109]: get_modulation_matrix(cfg, original_wavelength=6300, wavelength=8662)
+    Out[109]: 
+    (array([[ 1.        ,  0.82708773,  0.38460758, -0.40988156],
+            [ 1.        , -0.20711692,  0.33733864,  0.91831652],
+            [ 1.        ,  0.10358601, -0.99227222, -0.06830655],
+            [ 1.        , -0.66833404,  0.22666632, -0.7084857 ]]),
+     array([[ 1.        , -0.82708773, -0.38460758,  0.40988156],
+            [ 1.        ,  0.20711692, -0.33733864, -0.91831652],
+            [ 1.        , -0.10358601,  0.99227222,  0.06830655],
+            [ 1.        ,  0.66833404, -0.22666632,  0.7084857 ]]))
+ 
+    '''
+
+    pass
 
 
 def get_modulated_intensity(offset=0, wavelength=8542):
@@ -298,5 +372,5 @@ def save_top_bottom_intensity_curve():
     plt.savefig('intensity_vs_measurements.png', format='png', dpi=300)
 
 
-if __name__ == '__main__':
-    save_top_bottom_intensity_curve()
+# if __name__ == '__main__':
+    # save_top_bottom_intensity_curve()
