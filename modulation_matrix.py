@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
-
+import sys
 
 config = [[-22.5, 42.6], [-22.5, 69.9], [22.5, 47.4], [22.5, 20.1]]
 
@@ -46,18 +46,18 @@ def get_linear_polarizer(sign=1):
     )
 
 
-def get_input_angles(offset=0):
-    return np.radians(np.linspace(0, 180, 25)[1:] + offset)
+def get_input_angles(offset=0, total=24):
+    return np.radians(np.linspace(0, 180, total + 1)[1:] + offset)
 
 
 def get_initial_stokes():
     return np.array([1, 1, 0, 0]).reshape(4, 1)
 
 
-def get_input_stokes(offset=0):
+def get_input_stokes(offset=0, total=24):
     initial_stokes = get_initial_stokes()
 
-    input_angles = get_input_angles(offset=offset)
+    input_angles = get_input_angles(offset=offset, total=total)
 
     retardation = 2 * np.pi * 0.249
 
@@ -115,6 +115,71 @@ def get_modulation_matrix(config, original_wavelength=8542, wavelength=8542):
                 hwp_matrix
             ),
             qwp_matrix
+        )
+
+        if modulation_matrix_top is None:
+            modulation_matrix_top = mueller_matrix_top[0]
+            modulation_matrix_top = modulation_matrix_top.reshape(1, 4)
+        else:
+            modulation_matrix_top = np.concatenate(
+                (
+                    modulation_matrix_top,
+                    mueller_matrix_top[0].reshape(1, 4)
+                ),
+                axis=0
+            )
+
+        if modulation_matrix_bottom is None:
+            modulation_matrix_bottom = mueller_matrix_bottom[0]
+            modulation_matrix_bottom = modulation_matrix_bottom.reshape(1, 4)
+        else:
+            modulation_matrix_bottom = np.concatenate(
+                (
+                    modulation_matrix_bottom,
+                    mueller_matrix_bottom[0].reshape(1, 4)
+                ),
+                axis=0
+            )
+
+    return modulation_matrix_top.astype(np.float64), \
+        modulation_matrix_bottom.astype(np.float64)
+
+
+def get_modulation_matrix_when_waveplates_exchanged(config, original_wavelength=8542, wavelength=8542):
+
+    modulation_matrix_top = None
+    modulation_matrix_bottom = None
+
+    quarter_retardation = 2 * np.pi * 0.249 * original_wavelength / wavelength
+    half_retardation = 2 * np.pi * 0.249 * 2 * original_wavelength / wavelength
+
+    qwp_matrix_func = get_waveplate_matrix(quarter_retardation)
+    hwp_matrix_func = get_waveplate_matrix(half_retardation)
+
+    top_retarder = get_linear_polarizer(1)
+    bottom_retarder = get_linear_polarizer(-1)
+
+    for conf in config:
+        hwp_angle = np.radians(conf[0])
+        qwp_angle = np.radians(conf[1])
+
+        hwp_matrix = hwp_matrix_func(hwp_angle)
+        qwp_matrix = qwp_matrix_func(qwp_angle)
+
+        mueller_matrix_top = np.matmul(
+            np.matmul(
+                top_retarder,
+                qwp_matrix
+            ),
+            hwp_matrix
+        )
+
+        mueller_matrix_bottom = np.matmul(
+            np.matmul(
+                bottom_retarder,
+                qwp_matrix
+            ),
+            hwp_matrix
         )
 
         if modulation_matrix_top is None:
