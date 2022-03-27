@@ -62,7 +62,7 @@ def do_calc():
                 else:
                     new_ej_matrix[:, i] = old_ei_xy
                     new_ej_matrix[:, j] = old_ej_xy
-                sys.stdout.write('{}\n'.format(k))
+                sys.stdout.write('{} - {}\n'.format(k, score))
                 k += 1
 
     sunpy.io.fits.write(base_path / 'new_2_ej_matrix.fits', new_ej_matrix, dict())
