@@ -24,7 +24,7 @@ def do_calc():
     cdef numpy.ndarray[numpy.float64_t, ndim = 2] C_matrix
     cdef numpy.ndarray[numpy.float64_t, ndim = 2] ej_matrix
     cdef numpy.ndarray[numpy.float64_t, ndim = 2] new_ej_matrix
-    cdef numpy.ndarray[numpy.float64_t, ndim = 2] nnmean
+    cdef numpy.ndarray[numpy.float64_t, ndim = 2] medfiltered_better_flat
     cdef numpy.ndarray[numpy.float64_t, ndim = 2] sel_region
     cdef numpy.ndarray[numpy.float64_t, ndim = 2] corr
     cdef numpy.float64_t score
@@ -36,11 +36,12 @@ def do_calc():
     D_matrix = f['D_matrix'][()]
     C_matrix = f['C_matrix'][()]
     ej_matrix = f['ej_matrix'][()]
-    nnmean = f['nnmean'][()]
+    medfiltered_better_flat = f['medfiltered_better_flat'][()]
+    nnnmean = np.mean(medfiltered_better_flat, 0)
     f.close()
     new_ej_matrix = ej_matrix.copy()
-    sel_region = nnmean[300:500, 50:250]
-    corr = scipy.signal.fftconvolve(sel_region, sel_region[::-1, ::-1], mode='same')
+    sel_region = nnnmean[300:500, 50:250]
+    corr = scipy.signal.fftconvolve(nnnmean, sel_region[::-1, ::-1], mode='same')
     score = np.mean(np.abs(corr))
 
     k = 0
@@ -54,13 +55,14 @@ def do_calc():
                 new_D = np.dot(new_ej_matrix, C_matrix)
                 mean_new_D = np.mean(new_D.T.reshape(90, 512, 512), 0)
                 ns = np.mean(
-                    np.abs(scipy.signal.fftconvolve(sel_region, mean_new_D[300:500, 50:250][::-1, ::-1], mode='same')))
+                    np.abs(scipy.signal.fftconvolve(nnnmean, mean_new_D[300:500, 50:250][::-1, ::-1], mode='same')))
                 if ns < score:
                     score = ns
+                    sys.stdout.write('{}\n'.format(k))
                 else:
                     new_ej_matrix[:, i] = old_ei_xy
                     new_ej_matrix[:, j] = old_ej_xy
                 sys.stdout.write('{}\n'.format(k))
                 k += 1
 
-    sunpy.io.fits.write(base_path / 'new_ej_matrix.fits', new_ej_matrix, dict())
+    sunpy.io.fits.write(base_path / 'new_2_ej_matrix.fits', new_ej_matrix, dict())
