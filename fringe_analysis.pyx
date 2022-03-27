@@ -24,7 +24,7 @@ def do_calc():
     cdef numpy.ndarray[numpy.float64_t, ndim = 2] C_matrix
     cdef numpy.ndarray[numpy.float64_t, ndim = 2] ej_matrix
     cdef numpy.ndarray[numpy.float64_t, ndim = 2] new_ej_matrix
-    cdef numpy.ndarray[numpy.float64_t, ndim = 2] medfiltered_better_flat
+    cdef numpy.ndarray[numpy.float64_t, ndim = 3] medfiltered_better_flat
     cdef numpy.ndarray[numpy.float64_t, ndim = 2] sel_region
     cdef numpy.ndarray[numpy.float64_t, ndim = 2] corr
     cdef numpy.float64_t score
