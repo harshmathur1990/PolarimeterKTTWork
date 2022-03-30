@@ -1,3 +1,5 @@
+import numpy
+
 cimport numpy
 cimport cython
 import sys
@@ -26,7 +28,8 @@ def do_calc():
     cdef numpy.ndarray[numpy.float64_t, ndim = 2] new_ej_matrix
     cdef numpy.ndarray[numpy.float64_t, ndim = 3] medfiltered_better_flat
     cdef numpy.ndarray[numpy.float64_t, ndim = 2] sel_region
-    cdef numpy.ndarray[numpy.float64_t, ndim = 2] corr
+    cdef numpy.ndarray[numpy.complex128_t, ndim = 2] corr
+    cdef numpy.ndarray[numpy.complex128_t, ndim = 2] ncorr
     cdef numpy.float64_t score
     cdef numpy.ndarray[numpy.float64_t , ndim=2] new_D
     cdef numpy.ndarray[numpy.float64_t , ndim = 2] mean_new_D
