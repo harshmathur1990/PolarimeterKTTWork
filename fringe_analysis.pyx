@@ -41,28 +41,27 @@ def do_calc():
     f.close()
     new_ej_matrix = ej_matrix.copy()
     sel_region = nnnmean[300:500, 50:250]
-    corr = scipy.signal.fftconvolve(nnnmean, sel_region[::-1, ::-1], mode='same')
+    corr = np.fft.fft(sel_region, axis=1)
     score = np.mean(np.abs(corr))
 
     k = 0
     for i in range(D_matrix.shape[1]):
         for j in range(i + 1, D_matrix.shape[1], 1):
-            for theta in np.arange(-np.pi, np.pi, 0.1):
+            for theta in np.arange(-np.pi, np.pi, 0.01):
                 old_ei_xy = new_ej_matrix[:, i].copy()
                 old_ej_xy = new_ej_matrix[:, j].copy()
                 new_ej_matrix[:, i] = np.cos(theta) * old_ei_xy + np.sin(theta) * old_ej_xy
                 new_ej_matrix[:, j] = -np.sin(theta) * old_ei_xy + np.cos(theta) * old_ej_xy
                 new_D = np.dot(new_ej_matrix, C_matrix)
                 mean_new_D = np.mean(new_D.T.reshape(90, 512, 512), 0)
-                ns = np.mean(
-                    np.abs(scipy.signal.fftconvolve(nnnmean, mean_new_D[300:500, 50:250][::-1, ::-1], mode='same')))
+                ncorr = np.fft.fft(mean_new_D[300:500, 50:250], axis=1)
+                ns = np.mean(np.abs(ncorr))
                 if ns < score:
                     score = ns
-                    sys.stdout.write('{}\n'.format(k))
                 else:
                     new_ej_matrix[:, i] = old_ei_xy
                     new_ej_matrix[:, j] = old_ej_xy
                 sys.stdout.write('{} - {}\n'.format(k, score))
                 k += 1
 
-    sunpy.io.fits.write(base_path / 'new_2_ej_matrix.fits', new_ej_matrix, dict())
+    sunpy.io.fits.write(base_path / 'new_2_ej_matrix.fits', new_ej_matrix, dict(), overwrite=True)
