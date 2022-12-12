@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 import sys
 
-config = [[-22.5, 42.6], [-22.5, 69.9], [22.5, 47.4], [22.5, 20.1]]
-
+# config = [[-22.5, 42.6], [-22.5, 69.9], [22.5, 47.4], [22.5, 20.1]]
+# config = [[-68.1, 17.6], [-30.7, 106], [62.4, 71.2], [9.8, 57.2]]
 
 def get_waveplate_matrix(retardation):
     def retard_waveplate_matrix(theta):
