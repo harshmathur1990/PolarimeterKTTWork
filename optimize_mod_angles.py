@@ -42,6 +42,15 @@ def get_modulation_matrix(mod_ang):
         ]
     )
 
+    # P = np.array(
+    #     [
+    #         [1, 1, 0, 0],
+    #         [1, 1, 0, 0],
+    #         [0, 0, 0, 0],
+    #         [0, 0, 0, 0]
+    #     ]
+    # )
+
     a1, a2, a3, a4 = mod_ang
     f1 = Rot_mat_opt(-a1) @ P @ Rot_mat_opt(a1)
     f2 = Rot_mat_opt(-a2) @ P @ Rot_mat_opt(a2)
